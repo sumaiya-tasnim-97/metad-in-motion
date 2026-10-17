@@ -1,0 +1,7 @@
+{
+  "name": "metadynamics-in-motion-site",
+  "private": true,
+  "description": "Pre-renders the equations of index.html with MathJax",
+  "scripts": { "equations": "node eqs.js", "build": "node eqs.js && python3 build.py" },
+  "dependencies": { "mathjax-full": "3.2.2" }
+}

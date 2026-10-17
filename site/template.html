@@ -1,0 +1,779 @@
+<title>Metadynamics in Motion</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+/* Layout: one long page, one "stage" per demo — plots on the left, the equations they obey on the right, a transport bar underneath. */
+:root{
+  --paper:#f5f2ea; --card:#fbfaf6; --plot:#ffffff; --ink:#17202e; --body:#3d4656; --muted:#5d6573;
+  --line:#ddd6c8; --grid:#ece7dc; --orange:#c8551f; --orange-soft:rgba(200,85,31,.16); --blue:#2f63a8; --blue-soft:rgba(47,99,168,.14);
+  --hl:#fff4e8; --shadow:0 1px 0 rgba(23,32,46,.04);
+  --serif:'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --sans:'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mono:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#11151b; --card:#171c24; --plot:#141920; --ink:#ebe6db; --body:#c9cdd6; --muted:#949cab;
+  --line:#2a313c; --grid:#212833; --orange:#ea8150; --orange-soft:rgba(234,129,80,.2); --blue:#79a5ea; --blue-soft:rgba(121,165,234,.18);
+  --hl:#2a2119; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#11151b; --card:#171c24; --plot:#141920; --ink:#ebe6db; --body:#c9cdd6; --muted:#949cab;
+  --line:#2a313c; --grid:#212833; --orange:#ea8150; --orange-soft:rgba(234,129,80,.2); --blue:#79a5ea; --blue-soft:rgba(121,165,234,.18);
+  --hl:#2a2119; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--body);font-family:var(--sans);font-size:16px;line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 64px}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:72px}
+h1,h2{font-family:var(--serif);color:var(--ink);font-weight:600;text-wrap:balance;margin:0;line-height:1.12}
+h1{font-size:clamp(34px,5vw,58px)}
+h2{font-size:clamp(26px,3.2vw,38px)}
+p{margin:0}
+.eyebrow{font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:var(--orange)}
+.lede{font-size:18px;max-width:68ch}
+.top{padding-top:56px;display:flex;flex-direction:column;gap:20px}
+.key{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:14px;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:8px}
+.sw{width:22px;height:4px;border-radius:2px;display:inline-block}
+.toc{display:flex;flex-wrap:wrap;gap:10px}
+.toc a{color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px;background:var(--card)}
+.toc a:hover,.toc a:focus-visible{border-color:var(--orange);outline:none}
+.toc b{font-family:var(--mono);font-weight:500;color:var(--orange);margin-right:6px}
+
+.demo{display:flex;flex-direction:column;gap:18px;scroll-margin-top:16px}
+.demo-head{display:flex;flex-direction:column;gap:8px;max-width:78ch}
+.stage{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:20px;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.plots{display:grid;gap:12px;min-width:0}
+.plots.two{grid-template-columns:1fr 1fr}
+.plots .full{grid-column:1 / -1}
+canvas{width:100%;display:block;background:var(--plot);border-radius:8px;border:1px solid var(--grid)}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.eq{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--plot);color:var(--ink);opacity:.5;transition:opacity .3s, border-color .3s, background .3s;overflow-x:auto}
+.eq.on{opacity:1;border-color:var(--orange);background:var(--hl)}
+.eq .lab{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.eq .lab i{font-style:normal;font-family:var(--mono);letter-spacing:0;text-transform:none;font-weight:400}
+.eq svg{font-size:17px;max-width:100%;height:auto;display:block;margin:4px 0 2px}
+.eq g[class^="t-"]{transition:fill .25s}
+.eq g.lit{fill:var(--orange)}
+.eq g.lit-b{fill:var(--blue)}
+.now{border-left:4px solid var(--orange);padding:8px 14px;background:var(--plot);border-radius:0 10px 10px 0;color:var(--ink);font-size:16px;min-height:5.2em}
+.now .tag{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--orange);font-weight:600;margin-bottom:2px}
+.read{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.read div{background:var(--plot);border:1px solid var(--grid);border-radius:8px;padding:6px 10px;min-width:0}
+.read small{display:block;font-size:12px;color:var(--muted)}
+.read b{font-family:var(--mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;font-size:16px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bar button{font:600 15px var(--sans);color:var(--paper);background:var(--ink);border:0;border-radius:999px;padding:9px 18px;cursor:pointer;min-width:96px}
+.bar button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);min-width:0}
+.bar button:focus-visible,.bar input:focus-visible,.bar select:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.bar input[type=range]{flex:1;min-width:160px;accent-color:var(--orange)}
+.bar .clock{font-family:var(--mono);font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:12ch;text-align:right}
+.bar select{font:14px var(--sans);background:var(--plot);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.foot{font-size:14px;color:var(--muted);max-width:90ch}
+.tog{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;grid-column:1 / -1}
+.tog input{accent-color:var(--orange);width:16px;height:16px}
+.paper{margin:0;display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding-top:12px}
+.paper img{width:120px;flex:none;border-radius:6px;border:1px solid var(--line);background:#fff}
+.paper figcaption{font-size:13px;color:var(--muted);line-height:1.45;min-width:0}
+body.rec .tog,body.rec .paper{display:none}
+.foot code{font-family:var(--mono);font-size:13px}
+.intro{display:flex;flex-direction:column;gap:18px;scroll-margin-top:16px}
+.intro h2{max-width:28ch}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;counter-reset:st}
+.steps li{counter-increment:st;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.steps h3{margin:0;font:600 18px/1.3 var(--sans);color:var(--ink);display:flex;gap:10px;align-items:baseline}
+.steps h3::before{content:counter(st);font:500 13px var(--mono);color:var(--orange);border:1px solid var(--orange);border-radius:999px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.steps p{max-width:68ch}
+.intro .m{overflow-x:auto;color:var(--ink);padding:4px 0}
+.intro .m svg{font-size:16px;max-width:100%;height:auto}
+.contact{border-top:1px solid var(--line);padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
+.contact p{font-size:16px;color:var(--body)}
+.contact a{color:var(--blue);display:inline-block}
+.copy-mail{font:600 14px var(--sans);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer}
+.copy-mail:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+@media (max-width:900px){.steps{grid-template-columns:1fr}}
+body.rec .intro,body.rec .contact{display:none}
+
+@media (max-width:900px){.stage{grid-template-columns:1fr}.plots.two{grid-template-columns:1fr}}
+/* recording mode for the MP4 export */
+body.rec{padding:24px 28px;overflow:hidden}
+body.rec .wrap{max-width:none;gap:0}
+body.rec .top,body.rec .foot,body.rec .demo:not(.recording){display:none}
+body.rec .bar select,body.rec .bar .ghost{display:none}
+@media (prefers-reduced-motion: reduce){.eq,.eq g[class^="t-"]{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Interactive simulations · metadynamics</p>
+    <h1>Metadynamics in motion</h1>
+    <p class="lede">The three demonstrations from <code>demos.py</code>, then model versions of the two first tests in Laio &amp; Parrinello (2002), all replayed frame by frame. Press play and watch the graphs build up. The equation card that is driving the current step lights up on the right, and the highlighted term is the one you are seeing on the plot.</p>
+    <div class="key">
+      <span><i class="sw" style="background:var(--ink)"></i>true free energy F(s)</span>
+      <span><i class="sw" style="background:var(--orange)"></i>bias, hills, anything metadynamics adds</span>
+      <span><i class="sw" style="background:var(--blue)"></i>what we read off: F + V, estimates, fits</span>
+    </div>
+    <nav class="toc" aria-label="Sections">
+      <a href="#intro"><b>0</b>Introduction</a>
+      <a href="#d1"><b>1</b>Hills fill the wells</a>
+      <a href="#d2"><b>2</b>Standard vs well-tempered</a>
+      <a href="#d3"><b>3</b>Rates from infrequent metaD</a>
+      <a href="#pa"><b>A</b>2002 test: ion pair in water</a>
+      <a href="#pb"><b>B</b>2002 test: dipeptide map</a>
+      <a href="#refs"><b>§</b>References</a>
+      <a href="#code"><b>{ }</b>Source code</a>
+    </nav>
+  </header>
+
+  <section class="intro" id="intro" aria-labelledby="intro-h">
+    <p class="eyebrow">Introduction</p>
+    <h2 id="intro-h">What metadynamics is for</h2>
+    <ol class="steps">
+      <li><h3>The problem: rare events</h3>
+        <p>Molecular dynamics follows atoms femtosecond by femtosecond, but many processes we care about take microseconds to hours: a ligand leaving its pocket, a protein changing shape, an ion pair separating in water, a crystal starting to grow. The system spends nearly all its time rattling inside a free-energy basin. The waiting time to escape grows exponentially with the barrier height, so every extra k<sub>B</sub>T of barrier multiplies the wait by e ≈ 2.7.</p>
+        <div class="m" data-m="i_rate"></div></li>
+      <li><h3>Describe the process with a few coordinates</h3>
+        <p>Pick a small number of collective variables s(<b>R</b>), such as a distance, an angle or a coordination number, that tell the states apart. The free energy along s comes from how often each value would be seen at equilibrium. Its minima are the stable states and its saddles are the transition states.</p>
+        <div class="m" data-m="i_F"></div></li>
+      <li><h3>The idea: fill the wells you have already visited</h3>
+        <p>Metadynamics adds a bias that depends on the history of the run <span class="cite">[<a href="#ref1">1</a>, <a href="#ref3">3</a>]</span>. Every τ<sub>G</sub> it drops a small Gaussian hill at the current value of s, which discourages the system from returning there. The hills pile up in the basin until it overflows, the system escapes over the lowest saddle, and the next basin fills. Once the whole landscape is filled the system diffuses freely, and the accumulated bias is the free energy turned upside down <span class="cite">[<a href="#ref3">3</a>, <a href="#ref6">6</a>]</span>.</p>
+        <div class="m" data-m="i_hill"></div></li>
+      <li><h3>Well-tempered: shrink the hills as you go</h3>
+        <p>With hills of fixed size the estimate never stops fluctuating. Well-tempered metadynamics makes each new hill smaller where the bias is already high, so the bias settles in a single run <span class="cite">[<a href="#ref5">5</a>, <a href="#ref3">3</a>]</span>. It converges to a known fraction of −F, and the collective variable is sampled as if at the higher temperature T + ΔT while everything else stays at T.</p>
+        <div class="m" data-m="i_wt"></div></li>
+      <li><h3>From free energies to rates</h3>
+        <p>If hills are added slowly enough that the transition state never receives any bias, the biased run still crosses the barrier the way the real system does, only sooner. Each simulated step then counts for e<sup>βV</sup> steps of real time <span class="cite">[<a href="#ref9">9</a>, <a href="#ref4">4</a>]</span>. Repeating the run many times gives escape times that should follow an exponential distribution, and a statistical test checks that they do <span class="cite">[<a href="#ref10">10</a>, <a href="#ref4">4</a>]</span>.</p>
+        <div class="m" data-m="i_resc"></div></li>
+      <li><h3>What can go wrong</h3>
+        <p>Everything rests on the choice of collective variables. If a slow motion is missing from s, the bias fills a well that the system cannot actually leave along s, and both the free energy and the rates come out wrong. Hill height, width and spacing control the trade-off between speed and accuracy. The demonstrations below show each of these effects on models small enough to run in about a minute.</p></li>
+    </ol>
+  </section>
+
+  <section class="demo" id="d1">
+    <div class="demo-head">
+      <p class="eyebrow">Demonstration 1</p>
+      <h2>Gaussian hills fill three wells until the landscape is flat</h2>
+      <p>One particle, overdamped Langevin dynamics at k<sub>B</sub>T = 1 on the three-well profile of Laio &amp; Gervasio (2008). One hill of height 0.15 k<sub>B</sub>T and width 0.25 every 0.1 time units. Each frame below is one new hill.</p>
+    </div>
+    <div class="stage">
+      <div class="plots">
+        <canvas id="d1a" data-ar="1.9" aria-label="Free energy F(s), bias, and F plus V_G with the walker position"></canvas>
+        <canvas id="d1b" data-ar="3.6" aria-label="Trajectory of the collective variable s over time"></canvas>
+      </div>
+      <div class="side">
+        <div class="eq" data-eq="d1_hill"><div class="lab">The bias is a sum of hills<i>WIREs eq. 1.2</i></div></div>
+        <div class="eq" data-eq="d1_lang"><div class="lab">The walker feels F and the bias<i>Langevin</i></div></div>
+        <div class="eq" data-eq="d1_lim"><div class="lab">Long-time limit<i>WIREs eq. 1.4</i></div></div>
+        <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
+        <div class="read">
+          <div><small>hills in the sum</small><b class="r1"></b></div>
+          <div><small>walker s(t)</small><b class="r2"></b></div>
+          <div><small>max V<sub>G</sub> (k<sub>B</sub>T)</small><b class="r3"></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="play" type="button">Play</button>
+      <button class="ghost restart" type="button">Restart</button>
+      <input type="range" id="d1s" class="scrub" min="0" value="0" aria-label="Frame">
+      <select id="d1v" class="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <span class="clock"></span>
+    </div>
+  </section>
+
+  <section class="demo" id="d2">
+    <div class="demo-head">
+      <p class="eyebrow">Demonstration 2</p>
+      <h2>Two runs side by side: well-tempered hills shrink and the estimate settles</h2>
+      <p>Same model and hill parameters, 500 time units each. Orange is standard metadynamics. Blue is well-tempered with ΔT = 5T, so the bias factor γ = 6. Each frame is 2 time units, or 20 hills.</p>
+    </div>
+    <div class="stage">
+      <div class="plots two">
+        <canvas id="d2a" class="full" data-ar="2.3" aria-label="Reconstructed free energy from both runs compared with the true F"></canvas>
+        <canvas id="d2b" data-ar="1.45" aria-label="RMS error of the free-energy estimate versus time"></canvas>
+        <canvas id="d2c" data-ar="1.45" aria-label="Height of each deposited hill versus time"></canvas>
+      </div>
+      <div class="side">
+        <div class="eq" data-eq="d2_W"><div class="lab">Well-tempered hill height<i>WIREs eq. 1.9</i></div></div>
+        <div class="eq" data-eq="d2_lim"><div class="lab">What the WT bias converges to<i>WIREs eq. 1.10</i></div></div>
+        <div class="eq" data-eq="d2_est"><div class="lab">How we read F off each run</div></div>
+        <div class="eq" data-eq="d2_err"><div class="lab">Error plotted bottom left</div></div>
+        <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
+        <div class="read">
+          <div><small>error, standard</small><b class="r1"></b></div>
+          <div><small>error, WT</small><b class="r2"></b></div>
+          <div><small>newest WT hill W</small><b class="r3"></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="play" type="button">Play</button>
+      <button class="ghost restart" type="button">Restart</button>
+      <input type="range" id="d2s" class="scrub" min="0" value="0" aria-label="Frame">
+      <select id="d2v" class="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <span class="clock"></span>
+    </div>
+  </section>
+
+  <section class="demo" id="d3">
+    <div class="demo-head">
+      <p class="eyebrow">Demonstration 3</p>
+      <h2>A rescaled clock turns biased runs into an unbiased rate</h2>
+      <p>Double well F(s) = 8(s² − 1)², start at s = −1, stop at the first passage past s = 0.8. Hills of 0.2 k<sub>B</sub>T are added only once per time unit, so the transition state stays bias-free. First we follow one walker, then all 40.</p>
+    </div>
+    <div class="stage">
+      <div class="plots two">
+        <canvas id="d3a" data-ar="0.68" aria-label="Left panel: double-well landscape with bias, later the cumulative distribution of escape times"></canvas>
+        <canvas id="d3b" data-ar="0.68" aria-label="Right panel: rescaled time versus simulation time, later the histogram of acceleration factors"></canvas>
+      </div>
+      <div class="side">
+        <div class="eq" data-eq="d3_rate"><div class="lab">The rare event we want<i>h = 8 k<sub>B</sub>T</i></div></div>
+        <div class="eq" data-eq="d3_clock"><div class="lab">Rescale every step<i>JCTC eq. 11</i></div></div>
+        <div class="eq" data-eq="d3_cdf"><div class="lab">Expected distribution<i>JCTC eq. 13</i></div></div>
+        <div class="eq" data-eq="d3_ci"><div class="lab">Check and quote<i>JCTC eq. 14</i></div></div>
+        <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
+        <div class="read">
+          <div class="rl1"><small>simulation time t<sub>b</sub></small><b class="r1"></b></div>
+          <div class="rl2"><small>rescaled time τ</small><b class="r2"></b></div>
+          <div class="rl3"><small>e<sup>βV</sup> right now</small><b class="r3"></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="play" type="button">Play</button>
+      <button class="ghost restart" type="button">Restart</button>
+      <input type="range" id="d3s" class="scrub" min="0" value="0" aria-label="Frame">
+      <select id="d3v" class="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <span class="clock"></span>
+    </div>
+  </section>
+
+  <section class="demo" id="pa">
+    <div class="demo-head">
+      <p class="eyebrow">Laio &amp; Parrinello 2002 · test A</p>
+      <h2>An ion pair separates, and the water has to move with it</h2>
+      <p>A two-coordinate model shaped like Fig. 2 of the paper: the Na–Cl distance r and a solvent coordinate v that stands in for the field of the water on Cl. The path from the contact pair C to the separated pair D bends upward in v. Hills use the paper’s height, W = 0.3 kcal/mol, at 300 K. Each frame adds two hills.</p>
+    </div>
+    <div class="stage">
+      <div class="plots">
+        <canvas id="paa" data-ar="1.75" aria-label="Contour map of the free energy learned so far, as a function of ion distance and solvent coordinate, with the walker"></canvas>
+        <canvas id="pab" data-ar="3.2" aria-label="One-dimensional free energy along the distance, estimated versus the model's true profile"></canvas>
+        <label class="tog"><input type="checkbox" id="pat"> Show the model’s true surface in grey</label>
+      </div>
+      <div class="side">
+        <div class="eq" data-eq="a_hill"><div class="lab">Hills now live in two dimensions<i>PNAS eq. 2</i></div></div>
+        <div class="eq" data-eq="a_est"><div class="lab">The map is the bias, flipped<i>PNAS eq. 3</i></div></div>
+        <div class="eq" data-eq="a_marg"><div class="lab">Integrate out the solvent<i>bottom panel</i></div></div>
+        <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
+        <div class="read">
+          <div><small>hills</small><b class="r1"></b></div>
+          <div><small>walker r (Å)</small><b class="r2"></b></div>
+          <div><small>1D barrier est.</small><b class="r3"></b></div>
+        </div>
+        <figure class="paper"><img alt="Laio and Parrinello 2002, Fig. 2: free energy of NaCl in water versus Na–Cl distance and the solvent fields on Cl (top) and Na (bottom), with contact pair C, saddle S and dissociated state D" src="data:image/jpeg;base64,/*FIGA*/"><figcaption>Compare: the paper’s Fig. 2. The real study used all-atom water and 3 coordinates; the model keeps only the shape.</figcaption></figure>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="play" type="button">Play</button>
+      <button class="ghost restart" type="button">Restart</button>
+      <input type="range" id="pas" class="scrub" min="0" value="0" aria-label="Frame">
+      <select id="pav" class="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <span class="clock"></span>
+    </div>
+  </section>
+
+  <section class="demo" id="pb">
+    <div class="demo-head">
+      <p class="eyebrow">Laio &amp; Parrinello 2002 · test B</p>
+      <h2>The dipeptide map fills one basin at a time</h2>
+      <p>A periodic two-angle model shaped like the alanine dipeptide Ramachandran map in Fig. 3: α<sub>r</sub> is the global minimum, C7eq sits 1.25 kcal/mol higher, C5 is a shallow side minimum and α<sub>L</sub> (Φ &gt; 0) is high and rarely visited. The walker starts in C7eq, as in the paper. Each frame adds one hill.</p>
+    </div>
+    <div class="stage">
+      <div class="plots two">
+        <canvas id="pba" class="full" data-ar="1.45" aria-label="Contour map of the dihedral free energy learned so far, with the walker"></canvas>
+        <canvas id="pbb" class="full" data-ar="3.2" aria-label="Estimated C7eq to saddle barrier versus number of hills"></canvas>
+        <label class="tog"><input type="checkbox" id="pbt"> Show the model’s true surface in grey</label>
+      </div>
+      <div class="side">
+        <div class="eq" data-eq="b_hill"><div class="lab">Hills on a torus<i>PNAS eq. 2</i></div></div>
+        <div class="eq" data-eq="b_wrap"><div class="lab">Angles wrap: 180° is −180°</div></div>
+        <div class="eq" data-eq="b_bar"><div class="lab">The number the paper quotes<i>2.0 vs 2.1 kcal/mol</i></div></div>
+        <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
+        <div class="read">
+          <div><small>hills</small><b class="r1"></b></div>
+          <div><small>ΔF‡ est. (kcal/mol)</small><b class="r2"></b></div>
+          <div><small>C7eq above α<sub>r</sub></small><b class="r3"></b></div>
+        </div>
+        <figure class="paper"><img alt="Laio and Parrinello 2002, Fig. 3: free energy of alanine dipeptide versus Psi and Phi after 40, 100 and 200 steps" src="data:image/jpeg;base64,/*FIGB*/"><figcaption>Compare: the paper’s Fig. 3 after 40, 100 and 200 steps. It shows only the Φ &lt; 0 half of the map.</figcaption></figure>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="play" type="button">Play</button>
+      <button class="ghost restart" type="button">Restart</button>
+      <input type="range" id="pbs" class="scrub" min="0" value="0" aria-label="Frame">
+      <select id="pbv" class="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <span class="clock"></span>
+    </div>
+  </section>
+
+  <p class="foot">Tests A and B are two-coordinate toy models with overdamped Langevin dynamics at 300 K (k<sub>B</sub>T = 0.596 kcal/mol), built to match the shape and key energies of the paper’s Figs. 2 and 3. They are not the real NaCl or dipeptide systems. Model A: hills W = 0.3 kcal/mol with widths 0.12 Å and 4 units of v. Model B: hills 0.2 kcal/mol, width 14°. In demos 1–3, all curves come from <code>demos.py</code> (seed 7) re-run with every hill, trajectory point and walker recorded; nothing is smoothed or re-simulated in the browser. Demo 2 here samples the error every 2 time units, so its last point is at t = 498. Units: k<sub>B</sub>T = 1, D = 1, Δt = 10⁻³.</p>
+  <footer class="contact" id="contact">
+    <p>For questions or concerns about this page, contact <b>Sumaiya Tasnim</b> at <a href="mailto:tasnims@duq.edu" id="mail">tasnims@duq.edu</a></p>
+    <button type="button" class="copy-mail" id="copymail">Copy email address</button>
+  </footer>
+</div>
+
+<script>
+const SIM = /*SIM*/null;
+const EQS = /*EQS*/null;
+
+/* ---------- equations ---------- */
+document.querySelectorAll('.eq').forEach(el => el.insertAdjacentHTML('beforeend', EQS[el.dataset.eq]));
+document.querySelectorAll('.m').forEach(el => { el.innerHTML = EQS[el.dataset.m] || ''; });
+function lightEqs(root, spec){ // spec: {eqId: ['t-w', ...]} ; blue terms prefixed with 'b:'
+  root.querySelectorAll('.eq').forEach(el => {
+    const terms = spec[el.dataset.eq];
+    el.classList.toggle('on', !!terms);
+    el.querySelectorAll('g[class^="t-"]').forEach(g => {
+      const c = g.getAttribute('class').split(' ')[0];
+      const lit = terms && terms.includes(c), litb = terms && terms.includes('b:' + c);
+      g.classList.toggle('lit', !!lit); g.classList.toggle('lit-b', !!litb);
+    });
+  });
+}
+
+/* ---------- tiny plotting kit ---------- */
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let C = {};
+function readColors(){ C = {ink:css('--ink'), muted:css('--muted'), grid:css('--grid'), line:css('--line'), orange:css('--orange'), orangeS:css('--orange-soft'), blue:css('--blue'), blueS:css('--blue-soft'), plot:css('--plot'), sans:css('--sans'), mono:css('--mono')}; }
+readColors();
+function sizeCanvas(cv){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, ar = parseFloat(cv.dataset.ar), h = Math.round(w / (w < 520 ? Math.min(ar, 1.15 + (ar - 1.15) * 0.45) : ar));
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); cv.style.height = h + 'px'; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  return {ctx, w, h};
+}
+function niceTicks(a, b, n){
+  const span = b - a, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1,2,2.5,5,10].map(m => m*mag).find(s => s >= step0);
+  const out = []; for (let v = Math.ceil(a/step)*step; v <= b + 1e-9; v += step) out.push(+v.toFixed(10)); return out;
+}
+function richText(ctx, str, x, y, align, base, fs, weight){
+  // _x or _{..} -> subscript, ^x or ^{..} -> superscript (nesting allowed: e^{−t/τ_c})
+  const segs = [];
+  const parse = (s, scale, dy) => {
+    const re = /([_^])(\{[^}]*\}|[A-Za-z0-9α-ωΑ-Ω])/g; let last = 0, m;
+    while ((m = re.exec(s))) {
+      if (m.index > last) segs.push({t: s.slice(last, m.index), sc: scale, dy});
+      const inner = m[2].replace(/^\{|\}$/g, ''), sc = scale * 0.74;
+      parse(inner, sc, dy + (m[1] === '_' ? fs * scale * 0.32 : -fs * scale * 0.42));
+      last = re.lastIndex;
+    }
+    if (last < s.length) segs.push({t: s.slice(last), sc: scale, dy});
+  };
+  parse(str, 1, 0);
+  let W = 0; segs.forEach(s => { s.f = `${weight || ''} ${Math.round(fs * s.sc * 10) / 10}px ${C.sans}`; ctx.font = s.f; s.w = ctx.measureText(s.t).width; W += s.w; });
+  let x0 = align === 'center' ? x - W/2 : align === 'right' ? x - W : x;
+  ctx.textAlign = 'left'; ctx.textBaseline = base;
+  segs.forEach(s => { ctx.font = s.f; ctx.fillText(s.t, x0, y + s.dy); x0 += s.w; });
+}
+function frame(c, o){ // o: {x:[a,b], y:[a,b], xlog, title, xl, yl, xt, yt}
+  const {ctx, w, h} = c, fs = w < 420 ? 11 : 12.5;
+  const m = {l: 50, r: 14, t: o.title ? 30 : 12, b: 40};
+  const W = w - m.l - m.r, H = h - m.t - m.b;
+  const lx = v => o.xlog ? Math.log10(v) : v;
+  const X = v => m.l + (lx(v) - lx(o.x[0])) / (lx(o.x[1]) - lx(o.x[0])) * W;
+  const Y = v => m.t + H - (v - o.y[0]) / (o.y[1] - o.y[0]) * H;
+  ctx.font = `${fs}px ${C.sans}`; ctx.lineWidth = 1;
+  const xt = o.xt || (o.xlog ? [] : niceTicks(o.x[0], o.x[1], w < 420 ? 4 : 6)), yt = o.yt || niceTicks(o.y[0], o.y[1], 4);
+  ctx.strokeStyle = C.grid; ctx.fillStyle = C.muted;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  xt.forEach(v => { const x = X(v); ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, m.t+H); ctx.stroke(); ctx.fillText(o.xfmt ? o.xfmt(v) : +v.toFixed(2), x, m.t+H+6); });
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  yt.forEach(v => { const y = Y(v); ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(m.l+W, y); ctx.stroke(); ctx.fillText(+v.toFixed(2), m.l-7, y); });
+  ctx.strokeStyle = C.muted; ctx.beginPath(); ctx.moveTo(m.l, m.t); ctx.lineTo(m.l, m.t+H); ctx.lineTo(m.l+W, m.t+H); ctx.stroke();
+  ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  if (o.xl) richText(ctx, o.xl, m.l + W/2, h - 3 - fs*0.3, 'center', 'bottom', fs);
+  if (o.yl) { ctx.save(); ctx.translate(13, m.t + H/2); ctx.rotate(-Math.PI/2); richText(ctx, o.yl, 0, 0, 'center', 'middle', fs); ctx.restore(); }
+  if (o.title) { ctx.fillStyle = C.ink; richText(ctx, (w < 520 && o.titleShort) || o.title, m.l, 8, 'left', 'top', fs + 1.5, 600); }
+  ctx.save(); ctx.beginPath(); ctx.rect(m.l, m.t - 2, W + 2, H + 4); ctx.clip();
+  return {ctx, X, Y, m, W, H, fs, done(){ ctx.restore(); }};
+}
+function line(p, xs, ys, col, lw = 2, dash){
+  const {ctx, X, Y} = p; ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash || []); ctx.beginPath();
+  for (let i = 0; i < xs.length; i++) { const x = X(xs[i]), y = Y(ys[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function fillBetween(p, xs, lo, hi, col){
+  const {ctx, X, Y} = p; ctx.fillStyle = col; ctx.beginPath();
+  xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(hi[i])) : ctx.moveTo(X(x), Y(hi[i])));
+  for (let i = xs.length - 1; i >= 0; i--) ctx.lineTo(X(xs[i]), Y(lo[i]));
+  ctx.closePath(); ctx.fill();
+}
+function dot(p, x, y, col, r = 6){ const {ctx, X, Y} = p; ctx.fillStyle = col; ctx.strokeStyle = C.plot; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(x), Y(y), r, 0, 7); ctx.fill(); ctx.stroke(); }
+function label(p, txt, x, y, col, align = 'left', base = 'middle', bold){ const {ctx, X, Y, fs} = p; ctx.fillStyle = col; richText(ctx, String(txt), X(x), Y(y), align, base, fs, bold ? 600 : ''); }
+const linspace = (a, b, n) => Array.from({length: n}, (_, i) => a + (b - a) * i / (n - 1));
+
+/* bias grid that accumulates hills incrementally */
+function Bias(grid, sigma){ this.g = grid; this.s2 = 2*sigma*sigma; this.V = new Float64Array(grid.length); this.k = 0; }
+Bias.prototype.upto = function(hills, k, wConst){ // include hills[0..k-1]
+  if (k < this.k) { this.V.fill(0); this.k = 0; }
+  for (; this.k < k; this.k++) { const hh = hills[this.k], c = hh[1], w = wConst ?? hh[2];
+    for (let i = 0; i < this.g.length; i++) { const d = this.g[i] - c; if (d*d < 16*this.s2) this.V[i] += w * Math.exp(-d*d/this.s2); } }
+  return this.V;
+};
+Bias.prototype.at = function(s){ const g = this.g, n = g.length, f = (s - g[0]) / (g[n-1] - g[0]) * (n - 1), i = Math.max(0, Math.min(n - 2, Math.floor(f))), r = f - i; return this.V[i]*(1-r) + this.V[i+1]*r; };
+const countLE = (arr, t, key = 0) => { let lo = 0, hi = arr.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid][key] <= t + 1e-9) lo = mid + 1; else hi = mid; } return lo; };
+
+/* ---------- player ---------- */
+function Player(id, n, fps, render){
+  const root = document.getElementById(id), btn = root.querySelector('.play'), sc = root.querySelector('.scrub'), sp = root.querySelector('.speed');
+  const st = {f: n - 1, playing: false, acc: 0, last: 0};
+  sc.max = n - 1;
+  const draw = () => { sc.value = st.f; render(Math.round(st.f), root); };
+  const tick = ts => { if (!st.playing) return; const dt = Math.min(0.1, (ts - st.last) / 1000); st.last = ts;
+    st.f = Math.min(n - 1, st.f + dt * fps * parseFloat(sp.value)); draw();
+    if (st.f >= n - 1) { st.playing = false; btn.textContent = 'Replay'; root.dispatchEvent(new Event('ended')); return; }
+    requestAnimationFrame(tick); };
+  const play = () => { if (st.f >= n - 1) st.f = 0; st.playing = true; btn.textContent = 'Pause'; st.last = performance.now(); requestAnimationFrame(tick); };
+  const pause = () => { st.playing = false; btn.textContent = 'Play'; };
+  btn.onclick = () => st.playing ? pause() : play();
+  root.querySelector('.restart').onclick = () => { st.f = 0; draw(); play(); };
+  sc.oninput = () => { pause(); st.f = +sc.value; draw(); };
+  root.addEventListener('keydown', e => { if (e.key === ' ' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') { e.preventDefault(); btn.click(); } });
+  const P = {root, draw, play, pause, st, n, setTime(fn){ root.querySelector('.clock').textContent = fn; }};
+  return P;
+}
+const fmt = (v, d = 2) => (v >= 0 ? '' : '−') + Math.abs(v).toFixed(d);
+function caption(root, html){ const c = root.querySelector('.cap'); if (c.innerHTML !== html) c.innerHTML = html; }
+
+/* ---------- 2D helpers for the 2002 models ---------- */
+const SIM2 = /*SIM2*/null;
+function Bias2(xs, ys, sx, sy, periodic){ this.xs = xs; this.ys = ys; this.sx = sx; this.sy = sy; this.per = periodic; this.V = new Float64Array(xs.length * ys.length); this.k = 0; }
+Bias2.prototype.upto = function(hills, k, W){
+  if (k < this.k) { this.V.fill(0); this.k = 0; }
+  const nx = this.xs.length, ny = this.ys.length, wr = d => this.per ? ((d + 540) % 360) - 180 : d;
+  for (; this.k < k; this.k++) { const [cx, cy] = hills[this.k];
+    const ex = this.xs.map(x => { const d = wr(x - cx); return Math.exp(-d*d / (2*this.sx*this.sx)); });
+    const ey = this.ys.map(y => { const d = wr(y - cy); return Math.exp(-d*d / (2*this.sy*this.sy)); });
+    for (let i = 0; i < nx; i++) { if (ex[i] < 1e-4) continue; for (let j = 0; j < ny; j++) this.V[i*ny + j] += W * ex[i] * ey[j]; } }
+  return this.V;
+};
+const MS = {1:[[3,0]],2:[[0,1]],3:[[3,1]],4:[[1,2]],5:[[3,2],[0,1]],6:[[0,2]],7:[[3,2]],8:[[2,3]],9:[[0,2]],10:[[0,3],[1,2]],11:[[1,2]],12:[[1,3]],13:[[0,1]],14:[[0,3]]};
+function contour(p, G, xs, ys, levels, ok, col, lw){
+  const {ctx, X, Y} = p, nx = xs.length, ny = ys.length;
+  levels.forEach((L, li) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = 1 - 0.72 * li / Math.max(1, levels.length - 1); ctx.beginPath();
+    for (let i = 0; i < nx - 1; i++) for (let j = 0; j < ny - 1; j++) {
+      if (ok && !(ok(i, j) && ok(i+1, j) && ok(i+1, j+1) && ok(i, j+1))) continue;
+      const a = G[i*ny+j], b = G[(i+1)*ny+j], c = G[(i+1)*ny+j+1], d = G[i*ny+j+1];
+      const code = (a > L ? 1 : 0) | (b > L ? 2 : 0) | (c > L ? 4 : 0) | (d > L ? 8 : 0); if (!code || code === 15) continue;
+      const x0 = xs[i], x1 = xs[i+1], y0 = ys[j], y1 = ys[j+1], t = (u, v) => (L - u) / (v - u);
+      const E = [[x0 + (x1-x0)*t(a, b), y0], [x1, y0 + (y1-y0)*t(b, c)], [x0 + (x1-x0)*t(d, c), y1], [x0, y0 + (y1-y0)*t(a, d)]];
+      MS[code].forEach(([e1, e2]) => { ctx.moveTo(X(E[e1][0]), Y(E[e1][1])); ctx.lineTo(X(E[e2][0]), Y(E[e2][1])); });
+    }
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+function trail(p, pts, col, jump){
+  const {ctx, X, Y} = p; ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.globalAlpha = .45; ctx.beginPath();
+  pts.forEach((q, i) => { const pr = pts[i-1]; if (!i || (jump && (Math.abs(q[0]-pr[0]) > jump || Math.abs(q[1]-pr[1]) > jump))) ctx.moveTo(X(q[0]), Y(q[1])); else ctx.lineTo(X(q[0]), Y(q[1])); });
+  ctx.stroke(); ctx.globalAlpha = 1;
+}
+function arrow(p, x0, y0, x1, y1, col){
+  const {ctx, X, Y} = p, a = X(x0), b = Y(y0), c = X(x1), d = Y(y1), ang = Math.atan2(d - b, c - a);
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(c, d); ctx.lineTo(c - 12*Math.cos(ang - .4), d - 12*Math.sin(ang - .4)); ctx.lineTo(c - 12*Math.cos(ang + .4), d - 12*Math.sin(ang + .4)); ctx.closePath(); ctx.fill();
+}
+
+/* ================= 2002 test A: ion pair ================= */
+(() => {
+  const D = SIM2.A, kT = SIM2.kT, rs = linspace(2.2, 6, 96), vs = linspace(0, 120, 61), ny = vs.length;
+  const HS = D.hills.map(h => [h[0], h[1] * 100]), B = new Bias2(rs, vs, D.sr, D.sy * 100, false), n = D.bar.length, thr = 0.25 * D.W, diss = D.diss + 1;
+  const levels = Array.from({length: 12}, (_, i) => 0.5 * (i + 1)), ypath = r => 50 + 48 / (1 + Math.exp(-(r - 4) / 0.35));
+  const tog = document.getElementById('pat');
+  const beats = [
+    [20, () => 'The ions start in contact (C, r = 2.8 Å). Each hill has the paper’s height W = 0.3 kcal/mol and is centred on the walker’s current (r, v). Contours appear only where hills have landed.', {a_hill: ['t-w', 't-sp', 't-sp2']}],
+    [diss, () => 'Hills stack up in the contact-pair basin. The contours are the bias turned upside down: deepest where the most hills landed.', {a_est: ['b:t-neg'], a_hill: ['t-w']}],
+    [diss + 40, () => `Dissociation at hill ${diss}. Follow the trail: r grew from 2.8 to 5.4 Å while v climbed from about 50 to 95. The water reorganized during the separation. The 1D estimate below is still far off: the walker shot over the saddle region before it was filled.`, {a_hill: ['t-sp', 't-sp2']}],
+    [700, () => 'The walker recrosses many times and the channel C → S → D fills in. The dashed line r = 4.0 Å cuts the channel at an angle, so a fixed distance is not the true dividing surface. The arrow shows the real direction through the saddle.', {a_est: ['b:t-neg']}],
+    [1e9, f => `Integrating out v gives the 1D profile in r (bottom, blue): barrier ${D.bar[f] ?? '—'} kcal/mol against the model’s ${D.trueBar}. The paper did the same and got 3.4 against 3.3 from thermodynamic integration.`, {a_marg: ['b:t-int']}],
+  ];
+  const P = Player('pa', n, 30, (f, root) => {
+    const k = 2 * (f + 1), V = B.upto(HS, k, D.W);
+    let mn = Infinity; for (let i = 0; i < V.length; i++) if (V[i] > thr) mn = Math.min(mn, -V[i]);
+    const E = Array.from(V, v => -v - mn), ok = (i, j) => V[i*ny + j] > thr;
+    const ti = Math.min(D.traj.length - 1, k * 5), [x, y] = D.traj[ti];
+    const p = frame(sizeCanvas(root.querySelector('#paa')), {x: [2.2, 6], y: [0, 120], xl: 'Na–Cl distance r (Å)', yl: 'solvent coordinate v (kcal/mol)', title: 'Free energy learned so far, −V_G (contours every 0.5 kcal/mol)', titleShort: 'Learned −V_G (0.5 kcal/mol contours)'});
+    if (tog.checked) contour(p, D.trueF, rs, vs.map(v => v / 100).map(v => v * 100), levels, null, C.muted, 1);
+    contour(p, E, rs, vs, levels, ok, C.blue, 1.5);
+    trail(p, D.traj.slice(Math.max(0, ti - 500), ti + 1).map(q => [q[0], q[1] * 100]), C.orange);
+    const h = D.hills[k - 1]; p.ctx.strokeStyle = C.orange; p.ctx.lineWidth = 2; p.ctx.beginPath(); p.ctx.ellipse(p.X(h[0]), p.Y(h[1]*100), p.X(2.2 + D.sr) - p.X(2.2), p.Y(0) - p.Y(D.sy*100), 0, 0, 7); p.ctx.stroke();
+    dot(p, x, y * 100, C.orange, 6.5);
+    label(p, 'C', 2.8, 50, C.ink, 'center', 'middle', true);
+    if (k >= diss) { label(p, 'S', 4.0, 82, C.ink, 'center', 'bottom', true); label(p, 'D', 5.45, 97, C.ink, 'center', 'middle', true); }
+    if (k >= diss + 40) { line(p, [4, 4], [0, 120], C.ink, 1.4, [6, 5]); label(p, 'r = 4.0 Å', 4.05, 6, C.ink, 'left', 'middle'); arrow(p, 3.55, ypath(3.55), 4.5, ypath(4.5), C.orange); }
+    p.done();
+    // 1D marginal
+    const q = frame(sizeCanvas(root.querySelector('#pab')), {x: [2.2, 6], y: [-1, 6], yt: [0, 2, 4, 6], xl: 'r (Å)', yl: 'F_1 (kcal/mol)'});
+    line(q, rs, D.trueF1, C.muted, 1.6, [6, 4]);
+    const F1 = rs.map((_, i) => { let s = 0, vis = false; for (let j = 0; j < ny; j++) { s += Math.exp(-E[i*ny + j] / kT); if (ok(i, j)) vis = true; } return vis ? -kT * Math.log(s) : null; });
+    const ref = Math.min(...F1.filter((v, i) => v !== null && rs[i] < 3.3));
+    const segs = []; let cur = []; F1.forEach((v, i) => { if (v === null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([rs[i], v - ref]); }); if (cur.length) segs.push(cur);
+    segs.forEach(sg => line(q, sg.map(a => a[0]), sg.map(a => a[1]), C.blue, 2.4));
+    line(q, [4, 4], [-1, 6], C.ink, 1, [6, 5]);
+    label(q, 'model’s true profile', 5.95, 5.3, C.muted, 'right', 'middle'); label(q, 'from the bias', 5.95, 4.4, C.blue, 'right', 'middle', true);
+    q.done();
+    const b = beats.find(b => k < b[0]); caption(root, b[1](f)); lightEqs(root, b[2]);
+    root.querySelector('.r1').textContent = k;
+    root.querySelector('.r2').textContent = x.toFixed(2);
+    root.querySelector('.r3').textContent = D.bar[f] == null ? '—' : D.bar[f].toFixed(2);
+    P.setTime(`hills ${k} / ${2*n}`);
+  });
+  tog.onchange = () => P.draw();
+  window.PA = P;
+})();
+
+/* ================= 2002 test B: dipeptide-like map ================= */
+(() => {
+  const D = SIM2.B, ax = linspace(-180, 180, 73), ny = ax.length, B = new Bias2(ax, ax, D.s, D.s, true), n = D.hills.length, thr = 0.25 * D.W;
+  const levels = Array.from({length: 13}, (_, i) => 0.4 * (i + 1)), tog = document.getElementById('pbt');
+  const evAR = D.evAR + 1, evAL = D.evAL + 1;
+  const beats = [
+    [evAR, () => 'The walker starts in C7eq at Ψ = 165°. Ψ is an angle, so hills that spill past 180° reappear at −180° on the left edge: one basin, drawn on both sides.', {b_wrap: ['t-d'], b_hill: ['t-d', 't-d2']}],
+    [evAR + 230, () => `At hill ${evAR} the walker escapes into α<sub>r</sub>, the deepest basin. It takes many more hills to fill. Until it is full the map is misleading: the readout says C7eq is lower than α<sub>r</sub>, the opposite of the truth.`, {b_hill: ['t-w']}],
+    [evAL, f => `Both basins are filled and the neck between them is the saddle. The barrier from C7eq to the saddle is read straight off the flipped bias: now ${D.bar[f] ?? '—'} kcal/mol, wobbling around the model’s true ${D.trueBar} because standard metadynamics keeps adding full-height hills.`, {b_bar: ['t-s', 't-c', 'b:t-neg']}],
+    [1e9, () => `Hill ${evAL}: the walker reaches Φ &gt; 0 (α<sub>L</sub>), a high, rarely visited region. The paper reports the same: Φ &gt; 0 is explored after about 300 steps, and the earlier barriers do not change.`, {b_bar: ['b:t-neg']}],
+  ];
+  const P = Player('pb', n, 30, (f, root) => {
+    const k = f + 1, V = B.upto(D.hills, k, D.W);
+    let mn = Infinity; for (let i = 0; i < V.length; i++) if (V[i] > thr) mn = Math.min(mn, -V[i]);
+    const E = Array.from(V, v => -v - mn), ok = (i, j) => V[i*ny + j] > thr;
+    const ti = Math.min(D.traj.length - 1, k * 5), [x, y] = D.traj[ti];
+    const tk = [-180, -90, 0, 90, 180];
+    const p = frame(sizeCanvas(root.querySelector('#pba')), {x: [-180, 180], y: [-180, 180], xt: tk, yt: tk, xfmt: v => v + '°', xl: 'Ψ (degrees)', yl: 'Φ (degrees)', title: 'Free energy learned so far, −V_G (contours every 0.4 kcal/mol)', titleShort: 'Learned −V_G (0.4 kcal/mol contours)'});
+    if (tog.checked) contour(p, D.trueF, ax, ax, levels, null, C.muted, 1);
+    contour(p, E, ax, ax, levels, ok, C.blue, 1.5);
+    line(p, [-180, 180], [0, 0], C.muted, 1, [3, 5]);
+    label(p, 'the paper’s figure shows only Φ < 0', -175, 6, C.muted, 'left', 'bottom');
+    trail(p, D.traj.slice(Math.max(0, ti - 300), ti + 1), C.orange, 180);
+    dot(p, x, y, C.orange, 6.5);
+    [['α_r', -30, -63], ['C7eq', 165, -50], ['C5', 165, -150], ['α_L', 40, 62]].forEach(([l, a, b]) => label(p, l, a, b, C.ink, 'center', 'middle', true));
+    p.done();
+    const q = frame(sizeCanvas(root.querySelector('#pbb')), {x: [0, n], y: [0, 4], yt: [0, 1, 2, 3, 4], xl: 'hills deposited', yl: 'ΔF‡ (kcal/mol)'});
+    line(q, [0, n], [D.trueBar, D.trueBar], C.ink, 1.4, [6, 4]);
+    label(q, `model’s true ΔF‡ = ${D.trueBar}`, n - 5, D.trueBar - 0.2, C.ink, 'right', 'top');
+    let seg = []; const segs = []; D.bar.slice(0, k).forEach((v, i) => { if (v == null) { if (seg.length) segs.push(seg); seg = []; } else seg.push([i + 1, v]); }); if (seg.length) segs.push(seg);
+    segs.forEach(sg => line(q, sg.map(a => a[0]), sg.map(a => a[1]), C.blue, 2));
+    if (D.bar[f] != null) dot(q, k, D.bar[f], C.blue, 4.5);
+    [[evAR, 'α_r reached'], [evAL, 'Φ > 0 reached']].forEach(([e, l]) => { if (k >= e) { line(q, [e, e], [0, 4], C.orange, 1.2, [3, 3]); label(q, l, e + 4, 3.7, C.orange, 'left', 'middle'); } });
+    q.done();
+    const b = beats.find(b => k < b[0]); caption(root, b[1](f)); lightEqs(root, b[2]);
+    root.querySelector('.r1').textContent = k;
+    root.querySelector('.r2').textContent = D.bar[f] == null ? '—' : D.bar[f].toFixed(2);
+    root.querySelector('.r3').textContent = D.c7[f] == null ? '—' : D.c7[f].toFixed(2);
+    P.setTime(`hills ${k} / ${n}`);
+  });
+  tog.onchange = () => P.draw();
+  window.PB = P;
+})();
+
+/* ================= Demo 1 ================= */
+(() => {
+  const D = SIM.d1, F3 = x => -5*Math.exp(-(((x-2)/0.75)**2)) - 4*Math.exp(-((x/0.75)**2)) - 7*Math.exp(-(((x+2)/0.75)**2));
+  const g = linspace(-4, 4, 321), Fmin = Math.min(...g.map(F3)), F = g.map(x => F3(x) - Fmin);
+  const B = new Bias(g, D.sigma), n = D.hills.length;
+  const beats = [
+    [0.6, 'The walker starts in well B. Every τ<sub>G</sub> = 0.1 a Gaussian of height <b>w</b> = 0.15 k<sub>B</sub>T is dropped at its current position <b>s(t′)</b> (orange bump).', {d1_hill: ['t-w', 't-g', 't-sp']}],
+    [9, 'It slides into A, the deepest well, and the hills pile up there. Their force −∂<sub>s</sub>V<sub>G</sub> pushes the walker up the walls.', {d1_hill: ['t-g'], d1_lang: ['t-V']}],
+    [17, 'A is filled to the level of the A–B barrier. Thermal noise carries the walker over, and it starts filling C.', {d1_lang: ['t-V', 't-noise']}],
+    [42, 'A, B and C are now filled to similar heights. The walker hops among them while new hills smooth out the leftover bumps.', {d1_hill: ['t-w', 't-g', 't-sp'], d1_lang: ['t-V']}],
+    [1e9, 'F + V<sub>G</sub> (blue) is now far flatter than F, and the walker crosses freely among A, B and C. The orange bias is an upside-down copy of F, give or take the size of a hill.', {d1_lim: ['b:t-neg']}],
+  ];
+  const tr = D.traj;
+  const P = Player('d1', n, 30, (f, root) => {
+    const t = D.hills[f][0], V = B.upto(D.hills, f + 1, D.w), FV = F.map((v, i) => v + V[i]);
+    const ntr = countLE(tr, t), x = tr[Math.max(0, ntr - 1)][1];
+    // landscape
+    const ca = sizeCanvas(root.querySelector('#d1a'));
+    const p = frame(ca, {x: [-4, 4], y: [-0.5, 13.5], xl: 'collective variable s', yl: 'energy (k_BT)', title: 'F(s), the bias piled on top, and F + V_G', titleShort: 'F, the bias, and F + V_G'});
+    fillBetween(p, g, F, FV, C.orangeS);
+    line(p, g, F, C.ink, 3);
+    line(p, g, FV, C.blue, 2.2);
+    const c = D.hills[f][1], hill = g.map((s, i) => FV[i] - D.w * Math.exp(-((s - c)**2) / (2*D.sigma**2)));
+    fillBetween(p, g, hill, FV, C.orange);
+    dot(p, x, F3(x) - Fmin + B.at(x), C.orange, 7);
+    [['A', -2], ['B', 0], ['C', 2]].forEach(([l, s]) => label(p, l, s, F3(s) - Fmin - 0.25, C.muted, 'center', 'top', true));
+    label(p, 'F(s)', 3.9, F3(3.9) - Fmin + 0.4, C.ink, 'right', 'bottom', true);
+    label(p, 'F + V_G', -3.6, Math.min(FV[10] + 0.5, 12.3), C.blue, 'left', 'bottom', true);
+    p.done();
+    // trajectory
+    const cb = sizeCanvas(root.querySelector('#d1b'));
+    const q = frame(cb, {x: [0, 60], y: [-4, 4], yt: [-2, 0, 2], xl: 'time', yl: 's(t)'});
+    [-2, 0, 2].forEach(s => line(q, [0, 60], [s, s], C.grid, 1, [3, 3]));
+    const sub = tr.slice(0, ntr); line(q, sub.map(a => a[0]), sub.map(a => a[1]), C.ink, 1);
+    dot(q, t, x, C.orange, 5);
+    [['A', -2], ['B', 0], ['C', 2]].forEach(([l, s]) => label(q, l, 59.5, s + 0.15, C.muted, 'right', 'bottom', true));
+    q.done();
+    const b = beats.find(b => t < b[0]); caption(root, b[1]); lightEqs(root, b[2]);
+    root.querySelector('.r1').textContent = f + 1;
+    root.querySelector('.r2').textContent = fmt(x);
+    root.querySelector('.r3').textContent = Math.max(...V).toFixed(2);
+    P.setTime(`t = ${t.toFixed(1)} / 60`);
+  });
+  window.P1 = P;
+})();
+
+/* ================= Demo 2 ================= */
+(() => {
+  const D = SIM.d2, F3 = x => -5*Math.exp(-(((x-2)/0.75)**2)) - 4*Math.exp(-((x/0.75)**2)) - 7*Math.exp(-(((x+2)/0.75)**2));
+  const g = linspace(-3.2, 3.2, 257), Fmin = Math.min(...g.map(F3)), F = g.map(x => F3(x) - Fmin);
+  const Bs = new Bias(g, 0.25), Bw = new Bias(g, 0.25), n = D.std.err.length, fac = 1 + 1/D.dT;
+  const hw = D.wt.hills;
+  const beats = [
+    [20, 'Both runs start the same way. The bias is still small, so the exponential factor is close to 1 and well-tempered hills have almost full height: <b>W ≈ w</b>.', {d2_W: ['t-w']}],
+    [120, 'Where the bias is already high, the factor exp(−V/k<sub>B</sub>ΔT) shrinks each new well-tempered hill (blue dots, bottom right). Standard hills stay at w = 0.15 (orange line).', {d2_W: ['t-damp']}],
+    [300, 'Standard metadynamics keeps overfilling and refilling, so its error jumps up and down. The well-tempered bias converges to the fraction ΔT/(T+ΔT) = 5/6 of −F.', {d2_lim: ['t-frac'], d2_err: []}],
+    [1e9, 'Multiply the WT bias by (T+ΔT)/ΔT = 1.2 to get F. One run gives one stable answer, while the standard estimate is still fluctuating.', {d2_est: ['b:t-wt', 't-std'], d2_err: []}],
+  ];
+  const shift = a => { const m = Math.min(...a); return a.map(v => v - m); };
+  const P = Player('d2', n, 12, (f, root) => {
+    const t = D.std.err[f][0];
+    const Vs = Bs.upto(D.std.hills, countLE(D.std.hills, t), 0.15), kW = countLE(hw, t), Vw = Bw.upto(hw, kW);
+    const es = shift(Array.from(Vs, v => -v)), ew = shift(Array.from(Vw, v => -fac*v));
+    const ca = sizeCanvas(root.querySelector('#d2a'));
+    const p = frame(ca, {x: [-3.2, 3.2], y: [-0.5, 9.5], xl: 's', yl: 'k_BT', title: 'True F and the estimate read off each run', titleShort: 'True F and the two estimates'});
+    line(p, g, F, C.ink, 3.2);
+    line(p, g, es, C.orange, 2);
+    line(p, g, ew, C.blue, 2.2, [7, 4]);
+    label(p, 'true F', -1.4, 7.5, C.ink, 'left', 'middle', true);
+    label(p, 'standard  −V_G', -1.4, 9.1, C.orange, 'left', 'middle', true);
+    label(p, 'well-tempered  −1.2·V', -1.4, 8.3, C.blue, 'left', 'middle', true);
+    p.done();
+    const cb = sizeCanvas(root.querySelector('#d2b'));
+    const q = frame(cb, {x: [0, 500], y: [0, 4], xl: 'time', yl: 'RMS error (k_BT)', title: 'Error of the estimate, ε(t)'});
+    const es_ = D.std.err.slice(0, f + 1), ew_ = D.wt.err.slice(0, f + 1);
+    line(q, es_.map(a => a[0]), es_.map(a => a[1]), C.orange, 1.8);
+    line(q, ew_.map(a => a[0]), ew_.map(a => a[1]), C.blue, 2.2);
+    dot(q, t, es_[f][1], C.orange, 4.5); dot(q, t, ew_[f][1], C.blue, 4.5);
+    q.done();
+    const cc = sizeCanvas(root.querySelector('#d2c'));
+    const r = frame(cc, {x: [0, 500], y: [0, 0.17], yt: [0, 0.05, 0.1, 0.15], xl: 'time', yl: 'hill height (k_BT)', title: 'Height of every new hill'});
+    line(r, [0, t], [0.15, 0.15], C.orange, 2.4);
+    const ctx = r.ctx; ctx.fillStyle = C.blue; const step = Math.max(1, Math.floor(kW / 1500));
+    for (let i = 0; i < kW; i += step) { ctx.fillRect(r.X(hw[i][0]) - 1, r.Y(hw[i][2]) - 1, 2.2, 2.2); }
+    if (kW) dot(r, hw[kW-1][0], hw[kW-1][2], C.blue, 4.5);
+    label(r, 'standard: w = 0.15', 495, 0.158, C.orange, 'right', 'bottom', true);
+    r.done();
+    const b = beats.find(b => t < b[0]); caption(root, b[1]); lightEqs(root, b[2]);
+    root.querySelector('.r1').textContent = es_[f][1].toFixed(2);
+    root.querySelector('.r2').textContent = ew_[f][1].toFixed(2);
+    root.querySelector('.r3').textContent = kW ? hw[kW-1][2].toFixed(3) : '—';
+    P.setTime(`t = ${t.toFixed(0)} / 498`);
+  });
+  window.P2 = P;
+})();
+
+/* ================= Demo 3 ================= */
+(() => {
+  const D = SIM.d3, W = D.show['1'], tr = W.traj, hills = W.hills.map(h => [h[0], h[1]]);
+  const F2 = s => D.h * (s*s - 1)**2, g = linspace(-1.8, 1.8, 241), F = g.map(F2), B = new Bias(g, D.sigma);
+  const NA = Math.ceil(tr.length / 3), HOLD = 25, ADD = 2, NB = 40 * ADD, FIT = 30, CI = 40, n = NA + HOLD + NB + FIT + CI;
+  const last = tr[tr.length - 1], tauW = last[2], tbW = last[0];
+  const tres = D.tres, tb = D.tb, alpha = tres.map((v, i) => v / tb[i]);
+  const tfp = D.t_fp.slice().sort((a, b) => a - b);
+  const ecdf = a => { const s = a.slice().sort((x, y) => x - y); return s.map((v, i) => [v, (i + 1) / s.length]); };
+  const stepXY = (e, x0, x1) => { const xs = [x0], ys = [0]; e.forEach(([v, c], i) => { xs.push(v, v); ys.push(i ? e[i-1][1] : 0, c); }); xs.push(x1); ys.push(e.length ? e[e.length-1][1] : 0); return [xs, ys]; };
+  const rl = k => document.querySelector('#d3 .rl' + k + ' small');
+  const setLabels = (a, b, c) => { rl(1).innerHTML = a; rl(2).innerHTML = b; rl(3).innerHTML = c; };
+  const P = Player('d3', n, 30, (f, root) => {
+    const ca = sizeCanvas(root.querySelector('#d3a')), cb = sizeCanvas(root.querySelector('#d3b'));
+    if (f < NA + HOLD) {
+      const k = Math.min(tr.length - 1, f * 3 + 2), [tb_, x, tau] = tr[k];
+      const V = B.upto(hills, countLE(hills, tb_), D.w), FV = F.map((v, i) => v + V[i]), Vx = B.at(x);
+      const p = frame(ca, {x: [-1.8, 1.8], y: [0, 14], xl: 's', yl: 'energy (k_BT)', title: 'One walker: F and its bias'});
+      fillBetween(p, g, F, FV, C.orangeS);
+      line(p, g, F, C.ink, 3); line(p, g, FV, C.blue, 2);
+      line(p, [0.8, 0.8], [0, 14], C.muted, 1.2, [5, 4]);
+      label(p, 'escape at s = 0.8', 0.76, 13.3, C.muted, 'right', 'middle');
+      label(p, 'barrier 8 k_BT', 0, 8.3, C.ink, 'center', 'bottom');
+      dot(p, x, F2(x) + Vx, C.orange, 7);
+      p.done();
+      const sub = tr.slice(0, k + 1);
+      const q = frame(cb, {x: [0, 46], y: [0, 560], xl: 'simulation time t_b', yl: 'rescaled time τ', title: 'Two clocks'});
+      line(q, [0, 46], [0, 46], C.muted, 1.4, [5, 4]);
+      label(q, 'no bias: τ = t_b', 44, 52, C.muted, 'right', 'bottom');
+      line(q, sub.map(a => a[0]), sub.map(a => a[2]), C.orange, 2.4);
+      dot(q, tb_, tau, C.orange, 5);
+      if (f >= NA) label(q, `α = ${tau.toFixed(0)} / ${tb_.toFixed(1)} ≈ ${(tau/tb_).toFixed(0)}`, 2, 500, C.ink, 'left', 'middle', true);
+      q.done();
+      setLabels('simulation time t<sub>b</sub>', 'rescaled time τ', 'e<sup>βV</sup> right now');
+      root.querySelector('.r1').textContent = tb_.toFixed(1);
+      root.querySelector('.r2').textContent = tau.toFixed(1);
+      root.querySelector('.r3').textContent = Math.exp(Vx).toFixed(1);
+      if (tb_ < 4) { caption(root, 'One walker starts in the left well at s = −1. The barrier is 8 k<sub>B</sub>T, so unbiased escape takes about 430 time units on average.'); lightEqs(root, {d3_rate: ['t-k']}); }
+      else if (f < NA) { caption(root, `Hills raise the walker. Each step Δt is counted as Δt·<b>e<sup>βV</sup></b> at the walker’s position, so the rescaled clock τ (orange) runs ahead of t<sub>b</sub>. The higher the walker sits on the bias, the faster it ticks.`); lightEqs(root, {d3_clock: ['t-dt', 't-exp']}); }
+      else { caption(root, `Escape. The run took t<sub>b</sub> = ${tbW.toFixed(1)} time units, but it stands for τ = ${tauW.toFixed(0)} of unbiased dynamics: a speed-up α ≈ ${(tauW/tbW).toFixed(0)}.`); lightEqs(root, {d3_clock: ['t-alpha']}); }
+      P.setTime(`walker 2 · t_b = ${tb_.toFixed(1)}`);
+    } else {
+      const g2 = f - NA - HOLD, m = Math.min(40, Math.floor(g2 / ADD) + 1);
+      const showFit = g2 >= NB, showCI = g2 >= NB + FIT;
+      const p = frame(ca, {x: [3, 5000], y: [0, 1.02], xlog: true, xt: [10, 100, 1000], xfmt: v => v, yt: [0, 0.25, 0.5, 0.75, 1], xl: 'first-passage time (log scale)', yl: 'cumulative probability', title: 'Escape times of 40 walkers'});
+      const [bx, by] = stepXY(ecdf(tfp), 3, 5000); line(p, bx, by, C.muted, 1.6, [6, 4]);
+      if (showFit) { const ts = Array.from({length: 200}, (_, i) => 3 * Math.pow(5000/3, i/199)); line(p, ts, ts.map(t => 1 - Math.exp(-t / D.tau_c)), C.blue, 2.6); }
+      if (showCI) { p.ctx.fillStyle = C.blueS; p.ctx.fillRect(p.X(D.ci[0]), p.m.t, p.X(D.ci[1]) - p.X(D.ci[0]), p.H); line(p, [D.tau_md, D.tau_md], [0, 1.02], C.muted, 1.2); }
+      const cur = tres.slice(0, m), [ex, ey] = stepXY(ecdf(cur), 3, 5000); line(p, ex, ey, C.ink, 2.2);
+      const nw = tres[m - 1]; line(p, [nw, nw], [0, 0.06], C.orange, 3);
+      label(p, 'brute-force MD, 300 runs', 3.4, 0.97, C.muted, 'left', 'middle');
+      label(p, `rescaled metaD, n = ${m}`, 3.4, 0.9, C.ink, 'left', 'middle', true);
+      if (showFit) label(p, `fit 1 − e^{−t/τ_c},  τ_c = ${D.tau_c.toFixed(0)}`, 3.4, 0.83, C.blue, 'left', 'middle', true);
+      if (showCI) label(p, '95% CI', Math.sqrt(D.ci[0]*D.ci[1]), 0.1, C.blue, 'center', 'middle', true);
+      p.done();
+      const al = alpha.slice(0, m), bins = 12, lo = 0, hi = 30, bw = (hi - lo) / bins, cnt = new Array(bins).fill(0);
+      al.forEach(a => cnt[Math.min(bins - 1, Math.floor((a - lo) / bw))]++);
+      const q = frame(cb, {x: [lo, hi], y: [0, 12], xl: 'speed-up α = τ / t_b', yl: 'runs', title: 'Speed-up of each run'});
+      cnt.forEach((c, i) => { if (!c) return; const x0 = q.X(lo + i*bw) + 1, x1 = q.X(lo + (i+1)*bw) - 1; q.ctx.fillStyle = C.orange; q.ctx.globalAlpha = .75; q.ctx.fillRect(x0, q.Y(c), x1 - x0, q.Y(0) - q.Y(c)); q.ctx.globalAlpha = 1; });
+      const am = al.reduce((a, b) => a + b, 0) / al.length; line(q, [am, am], [0, 12], C.ink, 1.6, [5, 4]);
+      label(q, `mean ${am.toFixed(1)}×`, am + 0.5, 11.3, C.ink, 'left', 'middle', true);
+      q.done();
+      setLabels('walkers escaped', 'mean τ so far', showFit ? 'τ<sub>c</sub> fit / KS p' : 'newest τ');
+      root.querySelector('.r1').textContent = `${m} / 40`;
+      root.querySelector('.r2').textContent = (cur.reduce((a, b) => a + b, 0) / m).toFixed(0);
+      root.querySelector('.r3').textContent = showFit ? `${D.tau_c.toFixed(0)} / ${D.p_ks.toFixed(2)}` : nw.toFixed(0);
+      if (!showFit) { caption(root, 'Repeat with 40 independent walkers. Each rescaled escape time joins the black step curve. Grey dashed: 300 ordinary MD runs, mean 431, which metadynamics never sees.'); lightEqs(root, {d3_clock: ['t-exp'], d3_cdf: []}); }
+      else if (!showCI) { caption(root, `Fit the Poisson form 1 − e<sup>−t/τ<sub>c</sub></sup> to the black steps: τ<sub>c</sub> = ${D.tau_c.toFixed(0)}. The shapes match.`); lightEqs(root, {d3_cdf: ['b:t-cdf']}); }
+      else { caption(root, `KS test p = ${D.p_ks.toFixed(2)} &gt; 0.05, so the exponential model is not rejected. 95% CI ${D.ci[0].toFixed(0)}–${D.ci[1].toFixed(0)}: the brute-force 431 (grey line) sits just outside, about 20% off.`); lightEqs(root, {d3_ci: ['b:t-ks', 'b:t-ci']}); }
+      P.setTime(`walkers ${m} / 40`);
+    }
+  });
+  window.P3 = P;
+})();
+
+
+/* ---------- copy buttons for the source code ---------- */
+document.querySelectorAll('.src .copy').forEach(b => b.addEventListener('click', () => {
+  const code = b.closest('.xb').querySelector('pre code'), done = m => { b.textContent = m; setTimeout(() => b.textContent = 'Copy code', 1600); };
+  const select = () => { const r = document.createRange(); r.selectNodeContents(code); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected: press Ctrl/⌘ C'); };
+  try { navigator.clipboard.writeText(code.textContent).then(() => done('Copied'), select); } catch (e) { select(); }
+}));
+
+
+/* ---------- copy the contact email ---------- */
+(() => { const b = document.getElementById('copymail'), a = document.getElementById('mail'); if (!b) return;
+  const done = m => { b.textContent = m; setTimeout(() => b.textContent = 'Copy email address', 1600); };
+  const select = () => { const r = document.createRange(); r.selectNodeContents(a); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected: press Ctrl/⌘ C'); };
+  b.addEventListener('click', () => { try { navigator.clipboard.writeText(a.textContent).then(() => done('Copied'), select); } catch (e) { select(); } });
+})();
+
+/* ---------- boot ---------- */
+const players = [P1, P2, P3, PA, PB];
+function redrawAll(){ readColors(); players.forEach(p => p.draw()); }
+redrawAll();
+let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(redrawAll, 120); });
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); } catch (e) {}
+new MutationObserver(redrawAll).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme', 'class']});
+if (document.fonts) document.fonts.ready.then(redrawAll);
+/* recording mode (local MP4 export only): #rec1, #rec2, #rec3 */
+const rec = /^#rec([12345])$/.exec(location.hash);
+if (rec) { document.body.classList.add('rec'); const p = players[+rec[1] - 1]; p.root.classList.add('recording'); p.pause(); p.st.f = 0; setTimeout(() => { redrawAll(); setTimeout(() => p.play(), 1200); }, 300); }
+</script>
