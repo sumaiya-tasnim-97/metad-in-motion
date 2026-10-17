@@ -91,7 +91,7 @@ body.rec .tog,body.rec .paper{display:none}
 .copy-mail{font:600 14px var(--sans);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer}
 .copy-mail:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
 @media (max-width:900px){.steps{grid-template-columns:1fr}}
-body.rec .intro,body.rec .contact{display:none}
+body.rec .intro,body.rec .contact,body.rec .refs{display:none}
 
 @media (max-width:900px){.stage{grid-template-columns:1fr}.plots.two{grid-template-columns:1fr}}
 /* recording mode for the MP4 export */
@@ -196,7 +196,7 @@ body.rec .bar select,body.rec .bar .ghost{display:none}
         <div class="eq" data-eq="d2_W"><div class="lab">Well-tempered hill height<i>WIREs eq. 1.9</i></div></div>
         <div class="eq" data-eq="d2_lim"><div class="lab">What the WT bias converges to<i>WIREs eq. 1.10</i></div></div>
         <div class="eq" data-eq="d2_est"><div class="lab">How we read F off each run</div></div>
-        <div class="eq" data-eq="d2_err"><div class="lab">Error plotted bottom left</div></div>
+        <div class="eq" data-eq="d2_err"><div class="lab">Error against the known F<i>bottom left</i></div></div>
         <p class="now" aria-live="polite"><span class="tag">What is happening</span><span class="cap"></span></p>
         <div class="read">
           <div><small>error, standard</small><b class="r1"></b></div>
@@ -218,7 +218,7 @@ body.rec .bar select,body.rec .bar .ghost{display:none}
     <div class="demo-head">
       <p class="eyebrow">Demonstration 3</p>
       <h2>A rescaled clock turns biased runs into an unbiased rate</h2>
-      <p>Double well F(s) = 8(s² − 1)², start at s = −1, stop at the first passage past s = 0.8. Hills of 0.2 k<sub>B</sub>T are added only once per time unit, so the transition state stays bias-free. First we follow one walker, then all 40.</p>
+      <p>Double well F(s) = 8(s² − 1)², start at s = −1, stop at the first passage past s = 0.8. Hills of 0.2 k<sub>B</sub>T are added only once per time unit, so the transition state stays nearly bias-free. First we follow one walker, then all 40.</p>
     </div>
     <div class="stage">
       <div class="plots two">
@@ -315,7 +315,7 @@ body.rec .bar select,body.rec .bar .ghost{display:none}
     </div>
   </section>
 
-  <p class="foot">Tests A and B are two-coordinate toy models with overdamped Langevin dynamics at 300 K (k<sub>B</sub>T = 0.596 kcal/mol), built to match the shape and key energies of the paper’s Figs. 2 and 3. They are not the real NaCl or dipeptide systems. Model A: hills W = 0.3 kcal/mol with widths 0.12 Å and 4 units of v. Model B: hills 0.2 kcal/mol, width 14°. In demos 1–3, all curves come from <code>demos.py</code> (seed 7) re-run with every hill, trajectory point and walker recorded; nothing is smoothed or re-simulated in the browser. Demo 2 here samples the error every 2 time units, so its last point is at t = 498. Units: k<sub>B</sub>T = 1, D = 1, Δt = 10⁻³.</p>
+  <p class="foot">Tests A and B are two-coordinate toy models with overdamped Langevin dynamics at 300 K (k<sub>B</sub>T = 0.596 kcal/mol), built to match the shape and key energies of the paper’s Figs. 2 and 3. They are not the real NaCl or dipeptide systems. Model A: hills W = 0.3 kcal/mol with widths 0.12 Å and 4 units of v. Model B: hills 0.2 kcal/mol, width 14°. In demos 1–3, all curves come from <code>demos.py</code> (seed 7) re-run with every hill, trajectory point and walker recorded; nothing is smoothed or re-simulated in the browser. Demo 2 here samples the error every 2 time units, so its last point is at t = 498. Demo 3 and test A use the corrected code described in their Checks panels. Units: k<sub>B</sub>T = 1, D = 1, Δt = 10⁻³.</p>
   <footer class="contact" id="contact">
     <p>For questions or concerns about this page, contact <b>Sumaiya Tasnim</b> at <a href="mailto:tasnims@duq.edu" id="mail">tasnims@duq.edu</a></p>
     <button type="button" class="copy-mail" id="copymail">Copy email address</button>
@@ -508,7 +508,7 @@ function arrow(p, x0, y0, x1, y1, col){
     if (tog.checked) contour(p, D.trueF, rs, vs.map(v => v / 100).map(v => v * 100), levels, null, C.muted, 1);
     contour(p, E, rs, vs, levels, ok, C.blue, 1.5);
     trail(p, D.traj.slice(Math.max(0, ti - 500), ti + 1).map(q => [q[0], q[1] * 100]), C.orange);
-    const h = D.hills[k - 1]; p.ctx.strokeStyle = C.orange; p.ctx.lineWidth = 2; p.ctx.beginPath(); p.ctx.ellipse(p.X(h[0]), p.Y(h[1]*100), p.X(2.2 + D.sr) - p.X(2.2), p.Y(0) - p.Y(D.sy*100), 0, 0, 7); p.ctx.stroke();
+    const h = D.hills[k - 1]; p.ctx.strokeStyle = C.orange; p.ctx.lineWidth = 2; p.ctx.beginPath(); p.ctx.ellipse(p.X(h[0]), p.Y(h[1]*100), Math.max(0.5, p.X(2.2 + D.sr) - p.X(2.2)), Math.max(0.5, p.Y(0) - p.Y(D.sy*100)), 0, 0, 7); p.ctx.stroke();
     dot(p, x, y * 100, C.orange, 6.5);
     label(p, 'C', 2.8, 50, C.ink, 'center', 'middle', true);
     if (k >= diss) { label(p, 'S', 4.0, 82, C.ink, 'center', 'bottom', true); label(p, 'D', 5.45, 97, C.ink, 'center', 'middle', true); }
@@ -651,7 +651,7 @@ function arrow(p, x0, y0, x1, y1, col){
     label(p, 'well-tempered  −1.2·V', -1.4, 8.3, C.blue, 'left', 'middle', true);
     p.done();
     const cb = sizeCanvas(root.querySelector('#d2b'));
-    const q = frame(cb, {x: [0, 500], y: [0, 4], xl: 'time', yl: 'RMS error (k_BT)', title: 'Error of the estimate, ε(t)'});
+    const q = frame(cb, {x: [0, 500], y: [0, 4], xl: 'time', yl: 'RMS error (k_BT)', title: 'Error against the known model F, ε(t)', titleShort: 'Error vs the known F'});
     const es_ = D.std.err.slice(0, f + 1), ew_ = D.wt.err.slice(0, f + 1);
     line(q, es_.map(a => a[0]), es_.map(a => a[1]), C.orange, 1.8);
     line(q, ew_.map(a => a[0]), ew_.map(a => a[1]), C.blue, 2.2);
@@ -736,13 +736,13 @@ function arrow(p, x0, y0, x1, y1, col){
       const am = al.reduce((a, b) => a + b, 0) / al.length; line(q, [am, am], [0, 12], C.ink, 1.6, [5, 4]);
       label(q, `mean ${am.toFixed(1)}×`, am + 0.5, 11.3, C.ink, 'left', 'middle', true);
       q.done();
-      setLabels('walkers escaped', 'mean τ so far', showFit ? 'τ<sub>c</sub> fit / KS p' : 'newest τ');
+      setLabels('walkers escaped', 'mean τ so far', showCI ? 'calibrated KS p' : showFit ? 'τ<sub>c</sub> from the fit' : 'newest τ');
       root.querySelector('.r1').textContent = `${m} / 40`;
       root.querySelector('.r2').textContent = (cur.reduce((a, b) => a + b, 0) / m).toFixed(0);
-      root.querySelector('.r3').textContent = showFit ? `${D.tau_c.toFixed(0)} / ${D.p_ks.toFixed(2)}` : nw.toFixed(0);
-      if (!showFit) { caption(root, 'Repeat with 40 independent walkers. Each rescaled escape time joins the black step curve. Grey dashed: 300 ordinary MD runs, mean 431, which metadynamics never sees.'); lightEqs(root, {d3_clock: ['t-exp'], d3_cdf: []}); }
+      root.querySelector('.r3').textContent = showCI ? D.p_ks.toFixed(2) : showFit ? D.tau_c.toFixed(0) : nw.toFixed(0);
+      if (!showFit) { caption(root, 'Repeat with 40 independent walkers. Each rescaled escape time joins the black step curve. Grey dashed: 300 ordinary MD runs, mean ' + D.tau_md.toFixed(0) + ', which metadynamics never sees.'); lightEqs(root, {d3_clock: ['t-exp'], d3_cdf: []}); }
       else if (!showCI) { caption(root, `Fit the Poisson form 1 − e<sup>−t/τ<sub>c</sub></sup> to the black steps: τ<sub>c</sub> = ${D.tau_c.toFixed(0)}. The shapes match.`); lightEqs(root, {d3_cdf: ['b:t-cdf']}); }
-      else { caption(root, `KS test p = ${D.p_ks.toFixed(2)} &gt; 0.05, so the exponential model is not rejected. 95% CI ${D.ci[0].toFixed(0)}–${D.ci[1].toFixed(0)}: the brute-force 431 (grey line) sits just outside, about 20% off.`); lightEqs(root, {d3_ci: ['b:t-ks', 'b:t-ci']}); }
+      else { const inside = D.tau_md >= D.ci[0] && D.tau_md <= D.ci[1]; caption(root, `Mean τ = ${D.tau_mean.toFixed(0)}, 95% CI ${D.ci[0].toFixed(0)}–${D.ci[1].toFixed(0)} (blue band). The brute-force ${D.tau_md.toFixed(0)} (grey line) lies ${inside ? 'inside' : 'outside'} it. Calibrated KS test: p = ${D.p_ks.toFixed(2)}, so the exponential model is ${D.p_ks > 0.05 ? 'not rejected' : 'rejected'}. The checks below repeat this with 800 walkers.`); lightEqs(root, {d3_ci: ['b:t-ks', 'b:t-ci']}); }
       P.setTime(`walkers ${m} / 40`);
     }
   });

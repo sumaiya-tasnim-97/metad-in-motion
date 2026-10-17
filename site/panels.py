@@ -1,4 +1,13 @@
-import html, re, os
+import html, re, os, json
+import numpy as np
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+_j = lambda f: json.load(open(os.path.join(ROOT, 'data', f)))
+SIM, S2, VAL = _j('sim.json'), _j('sim2002.json'), _j('validation.json')
+D3, RT, FE, BD, IP, GR = SIM['d3'], VAL['rates'], VAL['fe'], VAL['boundary'], VAL['interp'], VAL['grid']
+f0 = lambda v: f"{v:.0f}"; f2 = lambda v: f"{v:.2f}"
+def table(head, rows):
+    return ('<div class="tw"><table class="pt"><thead><tr>' + ''.join(f'<th>{h}</th>' for h in head) + '</tr></thead><tbody>'
+            + ''.join('<tr>' + ''.join(f'<td>{c}</td>' for c in r) + '</tr>' for r in rows) + '</tbody></table></div>')
 
 def code(s):
     return '<pre class="code"><code>' + html.escape(s.strip('\n')) + '</code></pre>'
@@ -80,6 +89,14 @@ det('Pitfalls', f'''
 <li><b>One CV is a luxury.</b> Here s is the only coordinate, so it is automatically a perfect CV. In real systems a missing slow coordinate causes hysteresis: the bias fills a well, but the system does not leave it the way the CV predicts.</li>
 </ul>
 ''', 'Pitfalls'),
+det('Numerical checks', f'''
+<p>These come from <code>validate.py</code> (section <code>interp</code>).</p>
+<ul>
+<li><b>Bias force on the grid.</b> At 4000 random points, the grid force <code>np.interp(x, grid, np.gradient(V))</code> differs from the analytic derivative of 600 Gaussians by {IP['force_rms']:.4f} k<sub>B</sub>T per unit length (rms; worst case {IP['force_max']:.4f}). The typical force is {IP['force_typical']:.1f}, so the error is below 0.1%.</li>
+<li><b>Reflecting walls.</b> One deterministic step moves the walker by about 0.008 and the noise by about 0.045, against a domain 8 units wide, so a single reflection is always enough at this time step.</li>
+<li><b>The recording matches the run.</b> Each frame shows exactly the hills deposited up to that frame's time: frame k uses hills 1 to k + 1, and the clock reads the time of the last hill.</li>
+</ul>
+''', 'Checks'),
 ]
 
 # ------------------------------------------------------------------ Demo 2
@@ -139,6 +156,16 @@ det('Pitfalls', f'''
 <li><b>Edges.</b> The error is restricted to |s| &lt; 3.2 because near the reflecting walls both runs over-deposit, and that artefact would dominate the RMS.</li>
 </ul>
 ''', 'Pitfalls'),
+det('Numerical checks', f'''
+<p>Four more independent runs of each kind (seeds {', '.join(map(str, FE['seeds']))}), 500 time units each, from <code>validate.py</code> (section <code>fe</code>). The table compares free-energy differences read off the final bias with the exact values of the model.</p>
+{table(['Quantity (k<sub>B</sub>T)', 'Exact', 'Standard: mean ± SD', 'Well-tempered: mean ± SD'],
+       [[FE['names'][i], f2(FE['true'][i]), f"{FE['standard']['mean'][i]:.2f} ± {FE['standard']['sd'][i]:.2f}", f"{FE['wt']['mean'][i]:.2f} ± {FE['wt']['sd'][i]:.2f}"] for i in range(3)])}
+<ul>
+<li><b>Well-tempered is reproducible.</b> Its scatter between seeds is {min(FE['wt']['sd']):.1f}–{max(FE['wt']['sd']):.1f} k<sub>B</sub>T, and its means sit within {max(abs(a-b) for a, b in zip(FE['wt']['mean'], FE['true'])):.1f} k<sub>B</sub>T of the exact values.</li>
+<li><b>Standard metadynamics is not.</b> The same quantity can differ by {max(FE['standard']['sd']):.1f} k<sub>B</sub>T (one SD) from one run to the next, because the bias never stops changing.</li>
+<li><b>This check needs the exact F.</b> The error curve on the plot is measured against the known model surface. In a real simulation F is unknown, so you would compare independent runs, or follow the free-energy difference between basins over time.</li>
+</ul>
+''', 'Checks'),
 ]
 
 # ------------------------------------------------------------------ Demo 3
@@ -147,7 +174,7 @@ det('The model and its parameters', f'''
 <p>A symmetric double well in one coordinate, with an 8 k<sub>B</sub>T barrier. The particle starts at s = −1 and the "event" is the first passage past s = 0.8.</p>
 {m('x_F2')}
 <table class="pt"><thead><tr><th>Quantity</th><th>Brute-force MD</th><th>Infrequent metaD</th></tr></thead><tbody>
-<tr><td>Independent runs</td><td>N = 300</td><td>M = 40</td></tr>
+<tr><td>Independent runs</td><td>N = 300</td><td>M = 40 (and 4 × 200 in the checks)</td></tr>
 <tr><td>Hill height / width</td><td>none</td><td>0.2 k<sub>B</sub>T / 0.12</td></tr>
 <tr><td>Deposition stride</td><td>none</td><td>1000 steps (1 time unit)</td></tr>
 <tr><td>Bias</td><td>none</td><td>standard (not well-tempered)</td></tr>
@@ -165,57 +192,75 @@ while alive.any() and step < 8_000_000:
     done = alive & (x > 0.8); t_fp[done] = step*dt; alive &= ~done
 tau_md = np.nanmean(t_fp)
 """)}
-<p><b>Infrequent metadynamics.</b> Each of the 40 walkers has its own bias grid <code>Vb[k]</code> on [−2, 2]. Two clocks run side by side: <code>tb</code> counts simulated time, and <code>tres</code> accumulates the rescaled time.</p>
+<p><b>Infrequent metadynamics.</b> Each of the 40 walkers has its own bias grid <code>Vb[k]</code> on [−2, 2] with spacing 0.005. Two clocks run side by side: <code>tb</code> counts simulated time, and <code>tres</code> accumulates the rescaled time.</p>
 {code("""
-M = 40; xs = -np.ones(M); Vb = np.zeros((M, g2.size)); tres = np.zeros(M); tb = np.zeros(M)
-alive = np.ones(M, bool); w, sig, tin = 0.2, 0.12, 1000
-step = 0
 while alive.any():
-    if step % tin == 0:                                    # one hill per time unit
+    if step % tin == 0:                                      # one hill per time unit
         idx = np.where(alive)[0]
         Vb[idx] += w*np.exp(-(g2[None, :]-xs[idx, None])**2/(2*sig**2))
     idx = np.where(alive)[0]
-    gi = np.clip(((xs[idx]+2)/dg2).astype(int), 1, g2.size-2)   # nearest grid cell
-    Vloc = Vb[idx, gi]; dV = (Vb[idx, gi+1]-Vb[idx, gi-1])/(2*dg2)
-    tres[idx] += dt*np.exp(Vloc)                           # JCTC eq. 11
+    Vloc, dV = bias_at(Vb[idx], xs[idx], g2[0], dg2)        # linear interpolation on the bias grid
+    tres[idx] += dt*np.exp(Vloc)                             # JCTC eq. 11
     tb[idx] += dt
     xs[idx] += -(dF2(xs[idx])+dV)*dt + np.sqrt(2*dt)*rng.normal(size=idx.size)
     done = alive & (xs > 0.8); alive &= ~done; step += 1
 """)}
 <p>The rescaling is a running sum over every step of the biased run (JCTC eq. 11 {ref(4)}, from Tiwary &amp; Parrinello {ref(9)}):</p>
 {m('x_resc')}
-<p><b>Analysis.</b> The rescaled times are sorted into an empirical CDF and fitted with the Poisson form by least squares (<code>scipy.optimize.curve_fit</code>):</p>
+<p><b>Analysis.</b> Three numbers come out of the 40 rescaled times, all from <code>ratestats.py</code>:</p>
 {code("""
-tt, cc = ecdf(tres)
-tau_c = curve_fit(lambda t, tc: 1-np.exp(-t/tc), tt, cc, p0=[tau_md])[0][0]
-syn = rng.exponential(tau_c, 10000)
-p_ks = ks_2samp(tres, syn).pvalue
-ci = (2*tres.sum()/chi2.ppf(0.975, 2*n), 2*tres.sum()/chi2.ppf(0.025, 2*n))
+tau_c = fit_tau(tres)              # least-squares fit of 1 - exp(-t/tau_c) to the empirical CDF
+ks_D, p_ks = calibrated_ks(tres)   # KS distance to the fitted exponential, bootstrap-calibrated p
+ci = kaminsky_ci(tres)             # 95% chi-squared interval for the mean
 """)}
 {m('x_fit')}
-<p>The KS test compares the 40 times with 10 000 synthetic draws from the fitted exponential (Salvalaglio et al. {ref(10)}):</p>
+<p><b>The calibrated KS test.</b> The KS distance D measures the largest gap between the data's CDF and the fitted exponential. Because τ<sub>c</sub> was fitted to the same data, D is smaller than it would be against the true distribution, and the textbook KS p-value is too optimistic. The code calibrates it with a parametric bootstrap: draw 40 exponential times, refit τ, recompute D, 2000 times over. The p-value is the fraction of synthetic D at least as large as the observed one. This is the idea behind the Lilliefors test {ref(11)}.</p>
 {m('x_ks')}
-<p>The confidence interval is Kaminsky's χ² interval for an exponential mean (JCTC eq. 14 {ref(4, 12)}). With these numbers:</p>
+{code("""
+def calibrated_ks(t, B=2000, seed=12345):
+    t = np.asarray(t); n = t.size; rng = np.random.default_rng(seed)
+    tc = fit_tau(t); D = kstest(t, 'expon', args=(0, tc)).statistic
+    Ds = np.empty(B)
+    for b in range(B):
+        x = rng.exponential(tc, n)
+        Ds[b] = kstest(x, 'expon', args=(0, fit_tau(x))).statistic
+    return D, float((Ds >= D).mean())
+""")}
+<p><b>The confidence interval</b> is Kaminsky's χ² interval for an exponential mean (JCTC eq. 14 {ref(4, 12)}). With these numbers:</p>
 {m('x_cinum')}
 ''', 'Code'),
 det('What you should see, and why', f'''
 <ul>
 <li><b>The brute-force answer is predictable.</b> Kramers' formula for overdamped escape gives
 {m('x_kram')}
-close to the measured 431. The small difference is expected: the event is defined at s = 0.8 rather than at the far minimum, and Kramers' formula assumes a very high barrier.</li>
-<li><b>Exponential statistics.</b> With an 8 k<sub>B</sub>T barrier the walker equilibrates in the well long before escaping, so the times should be memoryless. KS p = 0.85 confirms it.</li>
-<li><b>A modest speed-up, about 12×.</b> The biased runs last about 40 time units, so each walker deposits about 40 hills. In the three walkers we tracked, the bias in the well peaks at about 1.8–5 k<sub>B</sub>T before escape, so e<sup>βV</sup> inside the well climbs to roughly 6–150. At s = 0.8 the bias is still exactly zero when each walker crosses: the transition region stayed clean, as infrequent metadynamics requires. The speed-up grows exponentially with the bias, so with real barriers of 20–30 k<sub>B</sub>T it can be enormous {ref(4)}.</li>
-<li><b>A 20% overestimate.</b> τ<sub>c</sub> = 515 against 431, and the 95% interval (444–829) just misses 431. The interval is computed from the plain mean, 592, which is pulled up by a few long runs. The fitted τ<sub>c</sub> follows the bulk of the CDF instead. Agreement within a factor of 2–3 is the accuracy level JCTC reports for real systems {ref(4)}.</li>
+close to the measured {f0(D3['tau_md'])}. The small difference is expected: the event is defined at s = 0.8 rather than at the far minimum, and Kramers' formula assumes a very high barrier.</li>
+<li><b>Agreement with brute force.</b> The 40 rescaled times have mean τ = {f0(D3['tau_mean'])} (95% CI {f0(D3['ci'][0])}–{f0(D3['ci'][1])}), against {f0(D3['tau_md'])} (CI {f0(D3['ci_md'][0])}–{f0(D3['ci_md'][1])}) from 300 unbiased runs. The least-squares fit to the CDF gives τ<sub>c</sub> = {f0(D3['tau_c'])}. For exponential data the plain mean is the maximum-likelihood estimate and the quantity the interval belongs to, so it is the number to quote.</li>
+<li><b>Exponential statistics.</b> With an 8 k<sub>B</sub>T barrier the walker equilibrates in the well long before escaping, so the times should be memoryless. The calibrated KS test gives p = {D3['p_ks']:.2f}, so the exponential model is not rejected. With only 40 events the test has limited power, which is why the checks below repeat the run with far more walkers.</li>
+<li><b>A modest speed-up, about {f0(D3['alpha'])}×.</b> The biased runs last about {np.mean(D3['tb']):.0f} time units, so each walker deposits about that many hills. The speed-up grows exponentially with the bias, so with real barriers of 20–30 k<sub>B</sub>T it can be enormous {ref(4)}.</li>
+<li><b>The barrier top is nearly, not perfectly, bias-free.</b> Across the 800 walkers of the checks at these settings, the bias near the barrier top (|s| &lt; 0.3) at the moment of escape averaged {RT['set_page']['V_top_mean']:.2f} k<sub>B</sub>T and never exceeded {max(r['V_top_max'] for r in RT['set_page']['runs']):.1f} k<sub>B</sub>T, small against the 8 k<sub>B</sub>T barrier.</li>
 </ul>
 ''', 'Expect'),
+det('Numerical checks', f'''
+<p>One run of 40 walkers cannot show whether the method is right or merely lucky. <code>validate.py</code> (section <code>rates</code>) therefore repeats the calculation with four independent sets of 200 walkers at each of four hill settings, and applies the calibrated KS test to each set.</p>
+{table(['Setting', 'Hills', 'Mean τ of each set', 'Mean ± SD of the four', 'Sets failing KS (p &lt; 0.05)', 'Bias at barrier top'],
+       [['Brute-force MD', 'none', '—', f"{RT['md']['mean']:.0f} (95% CI {RT['md']['ci'][0]:.0f}–{RT['md']['ci'][1]:.0f})", f"p = {RT['md']['p']:.2f}", '0']] +
+       [[s['label'], f"{s['w']} k<sub>B</sub>T every {s['stride']:g}", ', '.join(f0(r['mean']) for r in s['runs']), f"{s['mean_of_means']:.0f} ± {s['sd_of_means']:.0f}", f"{s['n_rejected']} of {len(s['runs'])}", f"{s['V_top_mean']:.2f} k<sub>B</sub>T"]
+        for s in (RT['set_page'], RT['set_slow'], RT['set_small'], RT['set_fast'])])}
+<ul>
+<li><b>Within the rules, the rate is right.</b> With hills of 0.2 k<sub>B</sub>T every 1 or 2 time units, or 0.1 k<sub>B</sub>T every 1, the averages of the four sets lie within {max(abs(RT[k]['mean_of_means']/RT['md']['mean']-1) for k in ('set_page','set_slow','set_small'))*100:.0f}% of the brute-force {f0(RT['md']['mean'])}.</li>
+<li><b>Breaking the rules gives the wrong rate, and the test notices.</b> With hills every 0.1 time units the bias reaches the barrier top ({RT['set_fast']['V_top_mean']:.2f} k<sub>B</sub>T on average), τ comes out {RT['set_fast']['mean_of_means']/RT['md']['mean']:.1f}× too long ({f0(RT['set_fast']['mean_of_means'])} ± {f0(RT['set_fast']['sd_of_means'])}), and all four sets fail the KS test.</li>
+<li><b>The shape test also rejects some good runs.</b> {sum(RT[k]['n_rejected'] for k in ('set_page','set_slow','set_small'))} of the 12 sets with acceptable settings fail at p &lt; 0.05 even though their means are accurate, more than the 1 in 20 expected by chance. With 200 events the test is sensitive enough to see that the rescaled times are only approximately exponential when the bias keeps growing during the wait. Treat a failed test as a reason to look closer, and compare the mean across independent sets.</li>
+<li><b>One set is not enough.</b> Single sets of 200 walkers range from {min(min(r['mean'] for r in RT[k]['runs']) for k in ('set_page','set_slow','set_small')):.0f} to {max(max(r['mean'] for r in RT[k]['runs']) for k in ('set_page','set_slow','set_small')):.0f}, consistent with the ±12% width of their 95% intervals. Independent repeats are the honest error bar.</li>
+</ul>
+''', 'Checks'),
 det('Pitfalls', f'''
 <ul>
-<li><b>Depositing too often.</b> If hills arrive while the walker is crossing, bias lands on the transition state. Z<sub>TS</sub> changes, the rescaling over-credits the run, and τ comes out too short. The KS p-value is the alarm. Try <code>tin = 100</code> to see it.</li>
+<li><b>Depositing too often.</b> If hills arrive while the walker is near the barrier, bias lands on the transition state and the rescaling no longer describes the real dynamics. In the checks above, hills every 0.1 time units made τ come out {RT['set_fast']['mean_of_means']/RT['md']['mean']:.1f}× too long, and the KS test rejected every set. Try <code>tin = 100</code> to see it.</li>
 <li><b>Hills too high.</b> Once the bias approaches the barrier height, escape is no longer a rare event and the exponential assumption fails. Keep the maximum bias clearly below ΔF<sup>‡</sup> (JCTC lists this among the conditions for time rescaling {ref(4)}).</li>
-<li><b>A bias that is not quasi-static.</b> JCTC eq. 8 assumes the bias in the basin has settled. Here the bias grows during the whole wait, which is one reason the estimate runs high. Larger strides or smaller hills reduce this, at the cost of a lower speed-up.</li>
-<li><b>Grid lookup.</b> The code reads V and its gradient from the nearest grid cell (spacing 0.005) rather than interpolating. With e<sup>βV</sup> in the clock, a 0.01 k<sub>B</sub>T error in V is a 1% error in each time increment. That is harmless here, but grids that are too coarse bias the clock.</li>
-<li><b>Too few events.</b> With fewer than 10 transitions the KS test has almost no power {ref(4)}. The standard KS test is also lenient, because τ<sub>c</sub> was fitted from the same data. The Lilliefors test corrects for this {ref(11)}.</li>
-<li><b>Mean ± SD.</b> For an exponential distribution the standard deviation equals the mean, so "592 ± 600" says nothing about how well you know τ. Quote the χ² interval.</li>
+<li><b>A bias that is not quasi-static.</b> JCTC eq. 8 assumes the bias in the basin has settled. Here the bias grows during the whole wait, which is why the rescaled times are only approximately exponential.</li>
+<li><b>Grid lookup.</b> The clock multiplies every step by e<sup>βV</sup>, so errors in V go straight into the time. Reading V from the nearest grid cell errs by up to {IP['nearest_V_max']:.2f} k<sub>B</sub>T here, a {(np.exp(IP['nearest_V_max'])-1)*100:.0f}% error in that step's time. The code interpolates linearly instead, which brings the error down to {IP['interp_V_max']:.4f} k<sub>B</sub>T.</li>
+<li><b>Too few events, and an uncalibrated test.</b> With fewer than 10 transitions the KS test has almost no power {ref(4)}. A KS p-value computed as if τ<sub>c</sub> were known in advance is too optimistic, because τ<sub>c</sub> was fitted from the same data. Calibrate it, as here, or use the Lilliefors test {ref(11)}.</li>
+<li><b>Mean ± SD.</b> For an exponential distribution the standard deviation equals the mean, so "{f0(D3['tau_mean'])} ± {f0(D3['tau_mean'])}" says nothing about how well you know τ. Quote the χ² interval, or the spread over independent sets.</li>
 <li><b>Stopping at the first passage.</b> InMetaD needs only forward transitions, but each run must be stopped and checked: did it reach the right product state? A run that wanders into a different state gives a time for the wrong process.</li>
 </ul>
 ''', 'Pitfalls'),
@@ -249,7 +294,8 @@ for i in range(nhill*tau):
     y += -Dy*(fy+by)*dt + np.sqrt(2*Dy*kT*dt)*rng.normal()
     if x < 2.2: x = 4.4-x
     if x > 6.0: x = 12-x
-    y = min(max(y, 0.0), 1.2)
+    if y < 0.0: y = -y                    # reflecting walls for the solvent coordinate
+    if y > 1.2: y = 2.4 - y
 """)}
 {m('x_lang2')}
 <p>The two coordinates get different diffusion coefficients because they have different natural scales: one Å in r against about 0.1 in y.</p>
@@ -260,17 +306,27 @@ for i in range(nhill*tau):
 det('What you should see, and why', f'''
 <ul>
 <li><b>The C basin fills first</b>, over about 90 hills, and its contours spread along both axes.</li>
-<li><b>Dissociation at hill 92.</b> The trail rises in v while r grows. This is the model's version of the paper's point: separating the ions requires reorganizing the solvent.</li>
-<li><b>An early 1D estimate is wrong.</b> Just after the first crossing the saddle region has barely been filled, so the 1D barrier reads 1.3 kcal/mol. Only after many recrossings does it approach the true 3.35.</li>
-<li><b>The final estimate</b> wobbles around 3.0–3.5 kcal/mol (3.53 at the end). That is a 5% error, comparable to the paper's 3.4 against 3.3 from thermodynamic integration.</li>
+<li><b>Dissociation at hill {S2['A']['diss']+1}.</b> The trail rises in v while r grows. This is the model's version of the paper's point: separating the ions requires reorganizing the solvent.</li>
+<li><b>An early 1D estimate is wrong.</b> Just after the first crossing the saddle region has barely been filled, so the 1D barrier reads {next(v for v in S2['A']['bar'] if v is not None):.1f} kcal/mol. Only after many recrossings does it approach the true 3.35.</li>
+<li><b>The final estimate</b> wobbles between {min(v for v in S2['A']['bar'][len(S2['A']['bar'])//2:] if v is not None):.1f} and {max(v for v in S2['A']['bar'][len(S2['A']['bar'])//2:] if v is not None):.1f} kcal/mol over the second half of the run and ends at {S2['A']['bar'][-1]:.2f}, against the model's {S2['A']['trueBar']:.2f}. The paper reported 3.4 against 3.3 from thermodynamic integration.</li>
 <li><b>The dashed line r = 4.0 Å cuts the channel at an angle.</b> A dividing surface at fixed distance would count some solvent configurations as "crossed" that will fall back. The arrow shows the real direction of the channel through S.</li>
 </ul>
 ''', 'Expect'),
+det('Numerical checks', f'''
+<p>The solvent coordinate has walls at y = 0 and 1.2. An earlier version of this model clipped y at the walls instead of reflecting it. Clipping is not a valid boundary condition for Langevin dynamics, because it parks the walker exactly on the wall. <code>validate.py</code> (section <code>boundary</code>) runs the model both ways with three seeds.</p>
+{table(['Seed', 'Boundary', '1D barrier (kcal/mol)', 'Dissociation at hill', 'Time within 0.01 of the upper wall'],
+       [[r['seed'], k, f2(r['barrier']), r['dissociation'], f"{r['edge_fraction']*100:.1f}%"] for k in ('reflect', 'clip') for r in BD[k]])}
+<ul>
+<li><b>Dissociation is unaffected.</b> It happens at the same hill with either boundary, because the walker only reaches the upper wall late, after the D basin is filled.</li>
+<li><b>The barrier changes by up to {max(abs(a['barrier']-b['barrier']) for a, b in zip(BD['reflect'], BD['clip'])):.1f} kcal/mol</b>, about the same as the scatter between seeds ({min(r['barrier'] for r in BD['reflect']):.1f}–{max(r['barrier'] for r in BD['reflect']):.1f} with reflection). The page now uses reflecting walls.</li>
+</ul>
+''', 'Checks'),
 det('Pitfalls', f'''
 <ul>
 <li><b>This is not the paper's algorithm.</b> The 2002 method moved the CVs by a coarse-grained steepest-descent step using mean forces from short MD runs on 6 replicas {ref(1)}. Here the CVs follow Langevin dynamics directly, which is the later "continuous" metadynamics {ref(3)}. The filling behaviour is the same; the meaning of a "step" is not.</li>
 <li><b>Standard metadynamics never settles.</b> With full-height hills of 0.3 kcal/mol ≈ 0.5 k<sub>B</sub>T, the map keeps changing at the level of a hill. Average late frames, or use well-tempered metadynamics.</li>
 <li><b>Using only r as the CV.</b> If you bias r alone, the solvent coordinate is left to relax by itself. When it is slow, the bias overfills along r while the system waits for the water: hysteresis, and a barrier that depends on the run.</li>
+<li><b>Walls.</b> A coordinate confined to an interval needs reflecting walls. Clipping it to the interval piles probability onto the boundary; see the checks above.</li>
 <li><b>Edges of the channel.</b> Regions the walker never visited have no hills. The contour plot leaves them blank, but the marginal F<sub>1</sub>(r) treats them as high free energy, which is correct only if they really are.</li>
 </ul>
 ''', 'Pitfalls'),
@@ -322,6 +378,15 @@ det('What you should see, and why', f'''
 <li><b>Φ &gt; 0 is reached late</b> (hill 475), behind the ridge at Φ = 0°. The paper reports the same order of events.</li>
 </ul>
 ''', 'Expect'),
+det('Numerical checks', f'''
+<p>From <code>validate.py</code> (section <code>grid</code>).</p>
+<ul>
+<li><b>No seam at ±180°.</b> The bias evaluated at Ψ = −180° and Ψ = +180° (and likewise for Φ) agrees to {GR['seam_max']:.0e} kcal/mol, so the contours join smoothly across the edge of the map.</li>
+<li><b>The barrier estimate is grid-converged.</b> The minimax search gives the same pass height on finer grids:</li>
+</ul>
+{table(['Grid spacing', 'Estimated ΔF‡ from the bias (kcal/mol)', "Model's exact ΔF‡ (kcal/mol)"], [[f"{c['spacing']:g}°", f"{c['estimate']:.3f}", f"{c['true']:.3f}"] for c in GR['convergence']])}
+<p>The remaining gap between estimate and exact value ({GR['convergence'][-1]['estimate']-GR['convergence'][-1]['true']:.1f} kcal/mol at hill 700) is the fluctuation of standard metadynamics, not a grid effect.</p>
+''', 'Checks'),
 det('Pitfalls', f'''
 <ul>
 <li><b>Forgetting periodicity.</b> Without the minimum-image <code>wrap</code>, a hill at Ψ = 175° would not push a walker at Ψ = −175°, which is 10° away. The bias would build a false wall at the edge and the walker would pile up there.</li>
@@ -339,7 +404,7 @@ ABOUT = det('How this page draws the animations', f'''
 <li><b>The bias</b> at frame k is the sum of the first k recorded Gaussians, evaluated on a grid and accumulated incrementally. Scrubbing backwards rebuilds it from zero.</li>
 <li><b>Contour lines</b> on the 2D maps use marching squares. Each grid cell is classified by which of its four corners lie above the contour level, and a line segment is drawn through the interpolated crossing points. Cells with no hill nearby are left blank, which is why unexplored regions are empty.</li>
 <li><b>The equations</b> are typeset with MathJax ahead of time and embedded as SVG. The highlighted terms are tagged with classes that the player switches on and off.</li>
-<li><b>Files:</b> <code>demos.py</code> (the static figures), <code>record.py</code> (the same runs with full recording), <code>sim2002.py</code>, <code>surf.py</code> and <code>pre2002.py</code> (the 2002 models).</li>
+<li><b>Files:</b> <code>demos.py</code> (the static figures), <code>record.py</code> (the same runs with full recording), <code>ratestats.py</code> (rate statistics), <code>validate.py</code> (the numerical checks), <code>sim2002.py</code>, <code>surf.py</code> and <code>pre2002.py</code> (the 2002 models).</li>
 </ul>
 ''', 'Page')
 
@@ -369,10 +434,12 @@ REFS = f'''
 
 FILES = [
  ('demos.py', 'The three 1D demonstrations as static figures: hill filling (demo 1), standard vs well-tempered (demo 2) and infrequent-metadynamics kinetics (demo 3). Writes three PNG files and demo_results.json.', 'about 1 minute'),
- ('record.py', 'The same three runs with the same seed (7), recording every hill, trajectory point and walker clock. Writes sim.json, which this page replays. Its results match demos.py exactly.', 'about 45 seconds'),
+ ('record.py', 'The same three runs with the same seed (7), recording every hill, trajectory point and walker clock. Writes sim.json, which this page replays. Its results match demos.py exactly.', 'about 1 minute'),
+ ('ratestats.py', 'Shared helpers for the kinetics: linear interpolation of the bias grid, the fit of the Poisson CDF, the bootstrap-calibrated KS test and the χ² confidence interval.', None),
  ('surf.py', 'The two 2D model surfaces (ion pair and dipeptide-like map) and the minimax path search used to measure saddle heights. Imported by the next two scripts.', None),
  ('sim2002.py', '2D metadynamics on both models. Each model restarts the seed 2002, so the two runs are independent and reproducible. Writes raw2002.json.', 'about 45 seconds'),
  ('pre2002.py', 'Turns raw2002.json into the per-frame barrier readouts and true-surface grids this page uses. Writes sim2002.json.', 'about 30 seconds'),
+ ('validate.py', 'The numerical checks shown in the Checks panels: rate statistics over many independent walkers, free-energy recovery over several seeds, boundary treatment, interpolation accuracy, the periodic seam and grid convergence. Writes validation.json.', 'about 10 minutes'),
 ]
 def source_section():
     items = []
@@ -386,12 +453,13 @@ def source_section():
   <section class="refs" id="code">
     <p class="eyebrow">Source code</p>
     <h2>Run it yourself</h2>
-    <p class="lede">Every number and curve on this page comes from these five scripts. They need Python 3 with NumPy, SciPy and Matplotlib.</p>
+    <p class="lede">Every number and curve on this page comes from these seven scripts. They need Python 3 with NumPy, SciPy and Matplotlib.</p>
     <pre class="code"><code>pip install numpy scipy matplotlib
 python simulations/demos.py      # static figures for demos 1–3
 python simulations/record.py     # data/sim.json: full recording of demos 1–3
 python simulations/sim2002.py    # data/raw2002.json: the two 2D models
-python simulations/pre2002.py    # data/sim2002.json: readouts for the 2D models</code></pre>
+python simulations/pre2002.py    # data/sim2002.json: readouts for the 2D models
+python simulations/validate.py   # data/validation.json: the numerical checks</code></pre>
     <div class="more">{''.join(items)}</div>
   </section>
 """
@@ -424,6 +492,9 @@ table.pt th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:v
 .refs li:target{background:var(--hl);border-radius:6px}
 .refs .use{display:block;font-size:14px;color:var(--muted)}
 body.rec .more{display:none}
+.tw{overflow-x:auto;max-width:100%}
+.tw table.pt{max-width:none;min-width:560px}
+.tw th{text-transform:none;letter-spacing:0;font-size:12.5px}
 .src summary .meta{margin-left:auto;font:400 12.5px var(--mono);color:var(--muted)}
 .src summary::after{margin-left:16px !important}
 .src pre.code{max-height:560px;overflow:auto}
@@ -435,6 +506,7 @@ body.rec .more{display:none}
 
 def apply(t):
     for sid, items in P.items():
+        items = sorted(items, key=lambda s: 1 if 'Numerical checks' in s else 2 if '>Pitfalls<' in s else 0)
         start = t.index(f'<section class="demo" id="{sid}">')
         end = t.index('</section>', start)
         block = '\n    <div class="more"><p class="more-h">Go deeper</p>' + ''.join(items) + '</div>\n  '

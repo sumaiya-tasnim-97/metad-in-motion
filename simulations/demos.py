@@ -3,7 +3,9 @@ Demo 1: standard metaD filling a 3-well profile (cf. Laio & Gervasio 2008; Bardu
 Demo 2: standard vs well-tempered convergence of the bias
 Demo 3: infrequent metaD kinetics vs brute-force MD (cf. Ray & Parrinello 2023, eqs. 11-14, Fig. 2)
 """
-import numpy as np, json
+import numpy as np, json, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ratestats import bias_at, fit_tau, calibrated_ks, kaminsky_ci
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -108,8 +110,7 @@ while alive.any():
         idx = np.where(alive)[0]
         Vb[idx] += w*np.exp(-(g2[None, :]-xs[idx, None])**2/(2*sig**2))
     idx = np.where(alive)[0]
-    gi = np.clip(((xs[idx]+2)/dg2).astype(int), 1, g2.size-2)
-    Vloc = Vb[idx, gi]; dV = (Vb[idx, gi+1]-Vb[idx, gi-1])/(2*dg2)
+    Vloc, dV = bias_at(Vb[idx], xs[idx], g2[0], dg2)   # linear interpolation on the bias grid
     tres[idx] += dt*np.exp(Vloc)                      # JCTC eq. 11: tau = sum dt exp(beta V)
     tb[idx] += dt
     xs[idx] += -(dF2(xs[idx])+dV)*dt + np.sqrt(2*dt)*rng.normal(size=idx.size)
@@ -118,14 +119,11 @@ tau_inmetad = tres.mean(); alpha = (tres/tb).mean()
 
 def ecdf(v):
     v = np.sort(v); return v, np.arange(1, v.size+1)/v.size
-from scipy.optimize import curve_fit
-from scipy.stats import ks_2samp, chi2
 tt, cc = ecdf(tres)
-tau_c = curve_fit(lambda t, tc: 1-np.exp(-t/tc), tt, cc, p0=[tau_md])[0][0]
-syn = rng.exponential(tau_c, 10000)
-p_ks = ks_2samp(tres, syn).pvalue
+tau_c = fit_tau(tres)                    # least-squares fit of 1 - exp(-t/tau_c) to the ECDF
+ks_D, p_ks = calibrated_ks(tres)         # KS p-value calibrated by parametric bootstrap
 n = tres.size
-ci = (2*tres.sum()/chi2.ppf(0.975, 2*n), 2*tres.sum()/chi2.ppf(0.025, 2*n))
+ci = kaminsky_ci(tres)                   # 95% CI of the mean, the exponential MLE
 
 fig, ax = plt.subplots(1, 2, figsize=(13, 4.6))
 tgrid = np.logspace(np.log10(tt.min()*0.5), np.log10(tt.max()*3), 300)
@@ -134,7 +132,7 @@ ax[0].plot(tgrid, 1-np.exp(-tgrid/tau_c), color=ACC2, lw=2, label=f"Poisson fit,
 tm, cm = ecdf(t_fp)
 ax[0].step(tm, cm, where="post", color=GREY, lw=1.5, ls="--", label=f"brute-force MD, ⟨τ⟩ = {tau_md:.0f}")
 ax[0].set_xscale("log"); ax[0].set_xlabel("first-passage time"); ax[0].set_ylabel("cumulative probability")
-ax[0].set_title(f"KS p = {p_ks:.2f}"); ax[0].legend(frameon=False, fontsize=10, loc="upper left")
+ax[0].set_title(f"mean τ = {tres.mean():.0f} (95% CI {ci[0]:.0f}–{ci[1]:.0f}), calibrated KS p = {p_ks:.2f}", fontsize=12); ax[0].legend(frameon=False, fontsize=10, loc="upper left")
 ax[1].hist(tres/tb, bins=12, color=ACC2, alpha=0.8)
 ax[1].set_xlabel("acceleration factor α = τ / τ$_b$"); ax[1].set_ylabel("count")
 ax[1].set_title(f"Speed-up per run (mean α ≈ {alpha:.0f}×)")

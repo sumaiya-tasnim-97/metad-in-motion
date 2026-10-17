@@ -39,9 +39,24 @@ python simulations/demos.py      # static PNG figures for demos 1–3
 python simulations/record.py     # data/sim.json      (~45 s)
 python simulations/sim2002.py    # data/raw2002.json  (~45 s)
 python simulations/pre2002.py    # data/sim2002.json  (~30 s)
+python simulations/validate.py   # data/validation.json (~10 min)
 ```
 
-All runs are seeded (`default_rng(7)` for demos 1–3 and `default_rng(2002)` for each 2D model), so the output is bit-for-bit identical to the files in `data/`.
+`ratestats.py` holds the shared kinetics helpers (bias interpolation, the Poisson fit, the bootstrap-calibrated KS test and the χ² confidence interval). All runs are seeded (`default_rng(7)` for demos 1–3 and `default_rng(2002)` for each 2D model), so the output is bit-for-bit identical to the files in `data/`.
+
+## Numerical checks
+
+`validate.py` produces the evidence shown in the page's **Checks** panels:
+
+| Section | What it tests |
+|---|---|
+| `rates` | Infrequent metadynamics with four independent sets of 200 walkers at four hill settings: mean escape time against brute-force MD, a bootstrap-calibrated KS test, and the bias at the barrier top |
+| `fe` | Free-energy differences from standard and well-tempered runs over four seeds, against the exact model values |
+| `boundary` | Ion-pair model with clipped vs reflecting solvent walls, three seeds |
+| `interp` | Grid-interpolated bias and forces against analytic Gaussian derivatives |
+| `grid` | Dipeptide model: continuity across the ±180° seam and grid convergence of the barrier |
+
+Headline results: within the deposition rules, infrequent metadynamics reproduces the brute-force escape time to within about 4% (four sets of 200 walkers each). Depositing hills ten times too often makes τ about 1.6× too long, and the KS test rejects all four sets. Well-tempered runs recover free-energy differences within about 0.3 k<sub>B</sub>T, with a seed-to-seed scatter of 0.3–0.5 k<sub>B</sub>T.
 
 ## Rebuild the page
 
@@ -51,7 +66,7 @@ The equations are pre-rendered to SVG with MathJax (Node.js), and `site/eqs.json
 cd site
 npm install          # only needed to re-render equations
 node eqs.js          # writes eqs.json
-python build.py      # writes ../index.html
+python build.py      # writes ../index.html (and site/artifact.html, a fragment without <head>)
 ```
 
 ## References

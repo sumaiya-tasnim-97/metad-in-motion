@@ -14,4 +14,5 @@ doc = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
        + head + '</head>\n<body>\n' + body + '\n</body>\n</html>\n')
 open(os.path.join(ROOT, 'index.html'), 'w').write(doc)
+open(os.path.join(HERE, 'artifact.html'), 'w').write(t)          # fragment for hosts that add their own <head>
 print('wrote index.html,', len(doc), 'bytes')

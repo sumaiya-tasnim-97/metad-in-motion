@@ -5,7 +5,7 @@ DATA = os.path.join(HERE, '..', 'data')
 sys.path.insert(0, HERE)
 import numpy as np, json
 from scipy.optimize import curve_fit
-from scipy.stats import ks_2samp, chi2
+from ratestats import bias_at, fit_tau, calibrated_ks, kaminsky_ci
 rng = np.random.default_rng(7)
 def F3(x): return (-5*np.exp(-((x-2)/0.75)**2) - 4*np.exp(-(x/0.75)**2) - 7*np.exp(-((x+2)/0.75)**2))
 def dF3(x, h=1e-4): return (F3(x+h)-F3(x-h))/(2*h)
@@ -61,8 +61,7 @@ while alive.any():
         for k in SHOW:
             if alive[k]: whills[k].append((round(step*dt,3), round(float(xs[k]),4)))
     idx = np.where(alive)[0]
-    gi = np.clip(((xs[idx]+2)/dg2).astype(int), 1, g2.size-2)
-    Vloc = Vb[idx, gi]; dV = (Vb[idx, gi+1]-Vb[idx, gi-1])/(2*dg2)
+    Vloc, dV = bias_at(Vb[idx], xs[idx], g2[0], dg2)        # linear interpolation on the bias grid
     tres[idx] += dt*np.exp(Vloc); tb[idx] += dt
     xs[idx] += -(dF2(xs[idx])+dV)*dt + np.sqrt(2*dt)*rng.normal(size=idx.size)
     if step % 50 == 0:
@@ -71,11 +70,11 @@ while alive.any():
     done = alive & (xs > 0.8); finish[done] = step; alive &= ~done; step += 1
 for k in SHOW: wtraj[k].append((round(tb[k],3), round(float(xs[k]),4), round(float(tres[k]),3)))
 tt = np.sort(tres); cc = np.arange(1, M+1)/M
-tau_c = curve_fit(lambda t, tc: 1-np.exp(-t/tc), tt, cc, p0=[tau_md])[0][0]
-syn = rng.exponential(tau_c, 10000); p_ks = ks_2samp(tres, syn).pvalue
-ci = (2*tres.sum()/chi2.ppf(0.975, 2*M), 2*tres.sum()/chi2.ppf(0.025, 2*M))
+tau_c = fit_tau(tres)                       # least-squares fit to the ECDF
+ks_D, p_ks = calibrated_ks(tres)            # calibrated (parametric-bootstrap) KS p-value
+ci = kaminsky_ci(tres)                      # 95% CI of the mean (the exponential MLE)
 out["d3"] = {"h": h, "w": w, "sigma": sig, "tin": 1.0, "show": {str(k): {"traj": wtraj[k], "hills": whills[k]} for k in SHOW},
   "tres": [round(float(v),2) for v in tres], "tb": [round(float(v),3) for v in tb], "t_fp": [round(float(v),2) for v in t_fp],
-  "tau_md": tau_md, "tau_c": tau_c, "p_ks": p_ks, "ci": ci, "alpha": float((tres/tb).mean())}
+  "tau_md": tau_md, "tau_mean": float(tres.mean()), "tau_c": tau_c, "p_ks": p_ks, "ks_D": ks_D, "ci": ci, "ci_md": kaminsky_ci(t_fp), "alpha": float((tres/tb).mean())}
 print("d3", tau_md, tau_c, p_ks, ci, out["d3"]["alpha"], [len(wtraj[k]) for k in SHOW], [tres[k] for k in SHOW])
 json.dump(out, open(os.path.join(DATA, "sim.json"), "w"), separators=(",", ":"))

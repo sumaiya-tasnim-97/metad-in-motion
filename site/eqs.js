@@ -28,7 +28,7 @@ const E = {
  x_resc: String.raw`\tau_{\rm run}=\sum_{i=1}^{n_{\rm steps}}\Delta t\;e^{\beta V(s_i,t_i)},\qquad t_b=n_{\rm steps}\,\Delta t,\qquad \alpha=\frac{\tau_{\rm run}}{t_b}`,
  x_fit: String.raw`\tau_c=\arg\min_{\tau}\sum_{k=1}^{n}\Big[\tfrac{k}{n}-\big(1-e^{-t_{(k)}/\tau}\big)\Big]^2`,
  x_ks: String.raw`D_{nm}=\sup_t\big|\hat F_n(t)-\hat G_m(t)\big|,\qquad p=\Pr\big(D\ge D_{nm}\mid\text{same distribution}\big)`,
- x_cinum: String.raw`\sum_i\tau_i=23\,695,\quad n=40:\qquad \left[\frac{47\,390}{106.6},\ \frac{47\,390}{57.2}\right]=[444,\ 829]`,
+ x_cinum: String.raw`\sum_i\tau_i=17\,738,\quad n=40:\qquad \left[\frac{35\,475}{106.6},\ \frac{35\,475}{57.2}\right]=[333,\ 621]`,
  x_FA: String.raw`F(r,y)=U(r)+45\,\big[y-y_p(r)\big]^2,\qquad y_p(r)=0.50+\frac{0.48}{1+e^{-(r-4)/0.35}},\qquad v=100\,y`,
  x_U: String.raw`U(r)=2.15\,e^{-\left(\frac{r-4}{0.42}\right)^2}-1.2\,e^{-\left(\frac{r-2.8}{0.32}\right)^2}-1.6\,e^{-\left(\frac{r-5.4}{0.55}\right)^2}+\text{walls}`,
  x_lang2: String.raw`x_{n+1}=x_n-D_x\,\partial_x(F+V_G)\,\Delta t+\sqrt{2D_xk_BT\Delta t}\,\xi^x_n,\qquad D_r=1,\ D_y=0.12`,

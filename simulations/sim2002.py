@@ -23,7 +23,8 @@ def runA(nhill=1400, W=0.3, sr=0.12, sy=0.04, tau=250, dt=4e-4, Dr=1.0, Dy=0.12)
         y += -Dy*(fy+by)*dt + np.sqrt(2*Dy*kT*dt)*rng.normal()
         if x < 2.2: x = 4.4-x
         if x > 6.0: x = 12-x
-        y = min(max(y, 0.0), 1.2)
+        if y < 0.0: y = -y                     # reflecting walls for the solvent coordinate
+        if y > 1.2: y = 2.4 - y
         if i % 50 == 0: traj.append((round(x,3), round(y,3)))
     return H, traj
 def wrap(a): return (a+np.pi) % (2*np.pi) - np.pi
